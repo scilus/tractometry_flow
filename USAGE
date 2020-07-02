@@ -27,6 +27,7 @@ DESCRIPTION
                             pre-computed centroids have been provided.
 
                             You can provide pre-computed centroids such as
+                            (and use --use_provided_centroids true)
 
                             [root]
                             ├── S1

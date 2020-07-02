@@ -1,0 +1,85 @@
+Scilpy dMRI tractometry pipeline
+================================
+
+Compute tractometry on each bundles/metrics
+
+USAGE
+
+nextflow run main.nf [OPTIONAL_ARGUMENTS] (--root)
+
+DESCRIPTION
+
+--root=/path/to/[root]     Root folder containg multiple subjects
+
+                            [root]
+                            ├── S1
+                            │   ├── metrics
+                            │   │   └── *.nii.gz
+                            │   └── bundles
+                            │       └── *.trk
+                            └── S2
+                                ├── metrics
+                                │   └── *.nii.gz
+                                └── bundles
+                                    └── *.trk
+
+                            Bundle centroid will be computed on-the-fly if no
+                            pre-computed centroids have been provided.
+
+                            You can provide pre-computed centroids such as
+
+                            [root]
+                            ├── S1
+                            │   ├── metrics
+                            │   │   └── *.nii.gz
+                            │   ├── centroids
+                            │   │   └── [Bundle_Name]_centroid.trk
+                            │   └── bundles
+                            │       └── [Bundle_Name].trk
+                            └── S2
+                                ├── metrics
+                                │   └── *.nii.gz
+                                ├── centroids
+                                │   └── [Bundle_Name]_centroid.trk
+                                └── bundles
+                                    └── [Bundle_Name].trk
+
+                            Bundle and centroid file names must match the
+                            format described above.
+
+                            All subjects in the [root] folder must contain
+                            pre-computed centroids if pre-computed centroids
+                            are provided. In other words, you can't mix
+                            subjects with and without pre-computed centroids
+
+
+Metrics should be compressed Nifti files (.nii.gz) and centroids and fiber bundles should be
+in Trackvis format (.trk)
+
+OPTIONAL ARGUMENTS (current value)
+
+--nb_points                                 Split the fiber bundle in --nb_point sections ($nb_points)
+--use_provided_centroids                    Use the provided pre-computed centroids rather than using automatic computation ($use_provided_centroids)
+
+--skip_pruning                              Skip bundle pruning ($skip_pruning)
+--skip_outlier_rejection                    Skip bundle outlier rejection ($skip_outlier_rejection)
+
+--mean_std_density_weighting                Weight the mean/std by the local tract density ($mean_std_density_weighting)
+--mean_std_per_point_density_weighting        Weight the mean/std per point by the local tract density ($mean_std_per_point_density_weighting)
+--endpoints_metric_stats_normalize_weights  Normalize the weights to the [0, 1] range ($endpoints_metric_stats_normalize_weights)
+
+--processes                                 The number of parallel processes to launch ($cpu_count).
+                                            Only affects the local scheduler.
+--output_dir                                Directory where to write the final results.
+                                            By default, will be in "./results"
+
+NOTES
+
+The `scilpy/scripts` folder should be in your PATH environment variable
+
+The intermediate working directory is, by default, set to "./work".
+To change it, use the '-w WORK_DIR' argument.
+
+Use `-C config_file.config` to specify a non-default configuration file.
+
+If running this on OSX, use `-profile osx` to get the correct shell.

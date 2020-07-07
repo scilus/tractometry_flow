@@ -9,14 +9,15 @@ if(params.help) {
     usage = file("$baseDir/USAGE")
 
     cpu_count = Runtime.runtime.availableProcessors()
-    bindings = ["nb_points":"$params.nb_points",
-        "mean_std_density_weighting":"$params.mean_std_density_weighting",
-        "mean_std_per_point_density_weighting":"$params.mean_std_per_point_density_weighting",
-        "endpoints_metric_stats_normalize_weights":"$params.endpoints_metric_stats_normalize_weights",
-        "voxel_label_map_upsample":"$params.voxel_label_map_upsample",
-        "cpu_count":"$cpu_count",
-        "skip_pruning":"$params.skip_pruning",
-        "skip_outlier_rejection":"$params.skip_outlier_rejection"
+    bindings = ["use_provided_centroids":"$params.use_provided_centroids",
+                "nb_points":"$params.nb_points",
+                "mean_std_density_weighting":"$params.mean_std_density_weighting",
+                "mean_std_per_point_density_weighting":"$params.mean_std_per_point_density_weighting",
+                "endpoints_metric_stats_normalize_weights":"$params.endpoints_metric_stats_normalize_weights",
+                "voxel_label_map_upsample":"$params.voxel_label_map_upsample",
+                "cpu_count":"$cpu_count",
+                "skip_pruning":"$params.skip_pruning",
+                "skip_outlier_rejection":"$params.skip_outlier_rejection"
         ]
 
     engine = new groovy.text.SimpleTemplateEngine()
@@ -81,6 +82,10 @@ process Prune_Bundle {
 
     script:
     bname = bundle.name.take(bundle.name.lastIndexOf('.'))
+    if (bname.contains('__'))
+    {
+        bname = bname.substring(bname.lastIndexOf("__") + 2)
+    }
     min_length = params.pruning.default.min_length
     max_length = params.pruning.default.max_length
     for (entry in params.pruning) {
@@ -332,6 +337,11 @@ process Resample_Centroid {
     params.use_provided_centroids
 
     script:
+    bname = bname.replace("_centroid", "")
+    if (bname.contains('__'))
+    {
+        bname = bname.substring(bname.lastIndexOf("__") + 2)
+    }
     """
     scil_resample_streamlines.py $bundle "${sid}__${bname}__centroid.trk" --nb_pts_per_streamline $params.nb_points
     """

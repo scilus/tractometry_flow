@@ -486,7 +486,7 @@ process Bundle_Mean_Std_Per_Point {
     density_weighting =\
         params.mean_std_per_point_density_weighting ? '--density_weighting' : ''
     """
-    scil_bundle_mean_std_per_point.py --sort_keys $density_weighting $bundle\
+    scil_compute_bundle_mean_std_per_point.py --sort_keys $density_weighting $bundle\
         $label_map $distance_map $metrics |\
         jq 'to_entries|map({(.key|rtrimstr("__outliers_removed_colored")):.value})|
                            reduce .[] as \$item ({}; . + \$item)'\

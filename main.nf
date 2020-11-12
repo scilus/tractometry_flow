@@ -448,7 +448,8 @@ process Bundle_Volume_Per_Label {
 
     script:
     """
-    scil_bundle_volume_per_label.py\
+    scil_image_math.py convert $voxel_label_map $voxel_label_map --data_type int16 -f 
+    scil_compute_bundle_volume_per_label.py\
         --sort_keys\
         $voxel_label_map $bname >\
         ${sid}__${bname}__volume_per_label_raw.json

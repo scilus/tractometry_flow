@@ -5,7 +5,7 @@ Compute tractometry on each bundles/metrics
 
 USAGE
 
-nextflow run main.nf [OPTIONAL_ARGUMENTS] (--root)
+nextflow run main.nf [OPTIONAL_ARGUMENTS] (--input)
 
 DESCRIPTION
 

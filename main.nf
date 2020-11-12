@@ -389,7 +389,7 @@ process Bundle_Volume {
 
     script:
     """
-    scil_bundle_volume.py $bundle > ${sid}__${bname}__volume_raw.json
+    scil_compute_bundle_volume.py $bundle > ${sid}__${bname}__volume_raw.json
     jq 'to_entries|map({(.key|ltrimstr("${sid}__")|\
                          rtrimstr("__outliers_removed_colored")):.value})|\
         reduce .[] as \$item ({}; . + \$item)|\

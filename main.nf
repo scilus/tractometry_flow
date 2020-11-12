@@ -3,7 +3,7 @@ import com.google.common.hash.Hashing
 import com.google.common.base.Charsets
 
 params.help = false
-params.root = false
+params.input = false
 
 if(params.help) {
     usage = file("$baseDir/USAGE")
@@ -44,17 +44,17 @@ workflow.onComplete {
 }
 
 Channel
-    .fromFilePairs("$params.root/**/bundles/*.trk",
+    .fromFilePairs("$params.input/**/bundles/*.trk",
                    size: -1) { it.parent.parent.name }
     .set{in_bundles}
 
 Channel
-    .fromFilePairs("$params.root/**/metrics/*.nii.gz",
+    .fromFilePairs("$params.input/**/metrics/*.nii.gz",
                    size: -1) { it.parent.parent.name }
     .set{in_metrics}
 
 Channel
-    .fromFilePairs("$params.root/**/centroids/*.trk",
+    .fromFilePairs("$params.input/**/centroids/*.trk",
         size: -1) { it.parent.parent.name }
     .into{in_centroids; in_centroids_check}
 
@@ -298,7 +298,7 @@ process Bundle_Mean_Std {
     density_weighting =\
         params.mean_std_density_weighting ? '--density_weighting' : ''
     """
-    scil_bundle_mean_std.py $density_weighting $bundle $metrics >\
+    scil_compute_bundle_mean_std.py $density_weighting $bundle $metrics >\
         ${sid}__${bname}__mean_std_raw.json
     jq 'to_entries|map({(.key|ltrimstr("${sid}__")|\
                          rtrimstr("__outliers_removed_colored")):.value})|\
@@ -434,7 +434,7 @@ process Bundle_Voxel_Label_Map {
 
     script:
     """
-    scil_bundle_voxel_label_map.py  $bundle $centroid ${sid}__${bname}__voxel_label_map.nii.gz
+    scil_compute_bundle_voxel_label_map.py  $bundle $centroid ${sid}__${bname}__voxel_label_map.nii.gz
     """
 }
 

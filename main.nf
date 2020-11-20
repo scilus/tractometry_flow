@@ -174,8 +174,7 @@ process Color_Bundle {
     }
     """
     scil_assign_color_to_trk.py $bundle\
-        ${sid}__${bname}__outliers_removed_colored.trk\
-        $color
+        ${sid}__${bname}__outliers_removed_colored.trk $color
     """
 }
 

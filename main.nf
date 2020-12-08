@@ -82,8 +82,6 @@ process Color_Bundle {
 
     script:
     def json_str = JsonOutput.toJson(params.colors)
-    // File file = new File('colors.json')
-    // file.write(json_str)
     String bundles_list = bundles.join(", ").replace(',', '')
     """
     echo '$json_str' >> colors.json

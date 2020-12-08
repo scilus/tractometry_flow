@@ -47,7 +47,7 @@ workflow.onComplete {
 Channel
     .fromFilePairs("$params.input/**/bundles/*.trk",
                    size: -1) { it.parent.parent.name }
-    .set{in_bundles}
+    .into{bundles_for_coloring;bundles_for_centroids}
 
 Channel
     .fromFilePairs("$params.input/**/metrics/*.nii.gz",
@@ -57,28 +57,87 @@ Channel
 Channel
     .fromFilePairs("$params.input/**/centroids/*.trk",
         size: -1) { it.parent.parent.name }
-    .into{in_centroids; in_centroids_check}
+    .into{centroids_for_resample; in_centroids_check}
 
 in_metrics.into{metrics_for_mean_std;
                 metrics_for_endpoints_metrics; metrics_for_endpoints_roi_stats;
                 metrics_for_volume;
                 metrics_for_mean_std_per_point}
 
-process Color_Bundle {
+process Bundle_Centroid {
     input:
-    set sid, file(bundles) from in_bundles
+    set sid, file(bundles) from bundles_for_centroids
 
     output:
-    set sid, "*_colored.trk" into outlier_rejected_bundle_for_mean_std,
-             outlier_rejected_bundle_for_endpoints_map,
-             outlier_rejected_bundle_for_endpoints_metrics,
-             outlier_rejected_bundle_for_centroid,
-             outlier_rejected_bundle_for_label_and_distance_map,
-             outlier_rejected_bundle_for_volume,
-             outlier_rejected_bundle_for_streamline_count,
-             outlier_rejected_bundle_for_volume_per_label,
-             outlier_rejected_bundle_for_mean_std_per_point,
-             outlier_rejected_bundle_for_length_stats
+    set sid, "*_centroid.trk" into centroids_computed
+
+    when:
+    !params.use_provided_centroids
+
+    script:
+    String bundles_list = bundles.join(", ").replace(',', '')
+    """
+    for bundle in $bundles_list;
+        do if [[ \$bundle == *"__"* ]]; then
+            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
+            bname=\${bundle:\$pos}
+            bname=\$(basename \$bname .trk)
+        else
+            bname=\$(basename \$bundle .trk)
+        fi
+    
+        scil_compute_centroid.py \$bundle centroid.trk --nb_points $params.nb_points -f
+        scil_uniformize_streamlines_endpoints.py centroid.trk ${sid}__\${bname}_centroid.trk --auto
+    done
+    """
+}
+
+process Resample_Centroid {
+    input:
+    set sid, file(bundles) from centroids_for_resample
+
+    output:
+    set sid, "${sid}__*_centroid.trk" into centroids_provided
+
+    when:
+    params.use_provided_centroids
+
+    script:
+    String bundles_list = bundles.join(", ").replace(',', '')
+    """
+    for bundle in $bundles_list;
+        do if [[ \$bundle == *"__"* ]]; then
+            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
+            bname=\${bundle:\$pos}
+            bname=\$(basename \$bname .trk)
+        else
+            bname=\$(basename \$bundle .trk)
+        fi
+    
+        scil_resample_streamlines.py \$bundle "${sid}__\${bname}_centroid.trk" --nb_pts_per_streamline $params.nb_points
+    done
+    """
+}
+
+if (params.use_provided_centroids) {
+    centroids_provided
+        .into{centroid_for_label_and_distance_map; centroid_for_volume_per_label;lol}
+}
+else {
+    centroids_computed
+        .into{centroid_for_label_and_distance_map; centroid_for_volume_per_label;lol}
+}
+
+process Color_Bundle {
+    input:
+    set sid, file(bundles) from bundles_for_coloring
+
+    output:
+    set sid, "*_colored.trk" into bundles_for_mean_std, bundles_for_endpoints_map,
+             bundles_for_endpoints_metrics, bundles_for_centroid,
+             bundles_for_label_and_distance_map, bundles_for_volume,
+             bundles_for_streamline_count, bundles_for_volume_per_label,
+             bundles_for_mean_std_per_point, bundles_for_length_stats
 
     script:
     def json_str = JsonOutput.toJson(params.colors)
@@ -86,50 +145,68 @@ process Color_Bundle {
     """
     echo '$json_str' >> colors.json
     scil_assign_color_to_trk.py $bundles_list --colors_dict colors.json
+    for i in *_colored.trk; do
+        scil_uniformize_streamlines_endpoints.py \$i \$i --auto -f
+    done
     """
 }
 
-// process Bundle_Length_Stats {
-//     input:
-//     set sid, bname, file(bundle) from outlier_rejected_bundle_for_length_stats
+process Bundle_Length_Stats {
+    input:
+    set sid, file(bundles) from bundles_for_length_stats
 
-//     output:
-//     set sid, "${sid}__${bname}__length_stats.json" into\
-//         bundle_length_stats_to_aggregate
+    output:
+    set sid, "${sid}__length_stats.json" into bundle_length_stats_to_aggregate
 
-//     script:
-//     """
-//     scil_compute_streamlines_length_stats.py $bundle >\
-//         ${sid}__${bname}__length_stats_raw.json
-//     jq '{"${sid}": {"${bname}": .}}' \
-//         ${sid}__${bname}__length_stats_raw.json >\
-//             ${sid}__${bname}__length_stats.json
-//     """
-// }
+    script:
+    String bundles_list = bundles.join(", ").replace(',', '')
+    """
+    for bundle in $bundles_list;
+        do if [[ \$bundle == *"__"* ]]; then
+            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
+            bname=\${bundle:\$pos}
+            bname=\$(basename \$bname .trk)
+        else
+            bname=\$(basename \$bundle .trk)
+        fi
+        bname=\${bname/_colored/}
+        scil_compute_streamlines_length_stats.py \$bundle > \$bname.json
+        done
 
-// process Bundle_Endpoints_Map {
-//     input:
-//     set sid, bname, file(bundle) from outlier_rejected_bundle_for_endpoints_map
+        scil_merge_json.py *.json ${sid}__length_stats.json --parent_key ${sid} --keep_separate
+    """
+}
 
-//     output:
-//     set sid, val(bname), "${sid}__${bname}__endpoints_map.json"\
-//         into endpoints_map_to_aggregate
-//     set sid, val(bname), "${sid}__${bname}__endpoints_map_head.nii.gz",\
-//         "${sid}__${bname}__endpoints_map_tail.nii.gz"\
-//         into endpoints_map_for_roi_stats
+process Bundle_Endpoints_Map {
+    input:
+    set sid, file(bundles) from bundles_for_endpoints_map
 
-//     script:
-//     """
-//     scil_endpoints_map.py $bundle ${sid}__${bname}__endpoints_map_head.nii.gz \
-//         ${sid}__${bname}__endpoints_map_tail.nii.gz >\
-//             ${sid}__${bname}__endpoints_map_raw.json
-//     jq 'to_entries|map({(.key|ltrimstr("${sid}__")|\
-//                          sub("__outliers_removed_colored"; "")):.value})|\
-//         reduce .[] as \$item ({}; . * \$item)|\
-//         {"${sid}": .}' ${sid}__${bname}__endpoints_map_raw.json >\
-//             ${sid}__${bname}__endpoints_map.json
-//     """
-// }
+    output:
+    set sid, "${sid}__endpoints_map_raw.json" into endpoints_map_to_aggregate
+    set sid, "*_endpoints_map_head.nii.gz", "*_endpoints_map_tail.nii.gz" \
+        into endpoints_map_for_roi_stats
+
+    script:
+    String bundles_list = bundles.join(", ").replace(',', '')
+    """
+    for bundle in $bundles_list;
+        do if [[ \$bundle == *"__"* ]]; then
+            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
+            bname=\${bundle:\$pos}
+            bname=\$(basename \$bname .trk)
+        else
+            bname=\$(basename \$bundle .trk)
+        fi
+        bname=\${bname/_colored/}
+        mv \$bundle \$bname.trk
+
+        scil_endpoints_map.py \$bname.trk ${sid}__\${bname}_endpoints_map_head.nii.gz \
+            ${sid}__\${bname}_endpoints_map_tail.nii.gz >\
+                ${sid}__\${bname}_endpoints_map_raw.json
+    done
+    scil_merge_json.py *_endpoints_map_raw.json ${sid}__endpoints_map_raw.json --no_list --parent_key ${sid}
+    """
+}
 
 // metrics_for_endpoints_roi_stats
 //     .cross(endpoints_map_for_roi_stats)
@@ -170,7 +247,7 @@ process Color_Bundle {
 // }
 
 // metrics_for_endpoints_metrics
-//     .cross(outlier_rejected_bundle_for_endpoints_metrics)
+//     .cross(bundle_for_endpoints_metrics)
 //     .map{ch1, ch2 -> [*ch2, *ch1[1..-1]]}
 //     .set{in_endpoints_metrics}
 
@@ -192,7 +269,7 @@ process Color_Bundle {
 // }
 
 // metrics_for_mean_std
-//     .cross(outlier_rejected_bundle_for_mean_std)
+//     .cross(bundle_for_mean_std)
 //     .map{ch1, ch2 -> [*ch2, *ch1[1..-1]]}
 //     .set{in_bundle_mean_std}
 
@@ -219,63 +296,20 @@ process Color_Bundle {
 //     """
 // }
 
-// process Bundle_Centroid {
-//     input:
-//     set sid, bname, file(bundle) from outlier_rejected_bundle_for_centroid
 
-//     output:
-//     set sid, val(bname), "${sid}__${bname}__centroid.trk" into centroids_computed
 
-//     when:
-//     !params.use_provided_centroids
 
-//     script:
-//     """
-//     scil_compute_centroid.py $bundle centroid.trk --nb_points $params.nb_points
-//     scil_uniformize_streamlines_endpoints.py centroid.trk ${sid}__${bname}__centroid.trk --auto
-//     """
-// }
 
-// process Resample_Centroid {
-//     input:
-//     set sid, bname, file(bundle) from centroids_for_resample
-
-//     output:
-//     set sid, val(bname), "${sid}__${bname}__centroid.trk" into centroids_provided
-
-//     when:
-//     params.use_provided_centroids
-
-//     script:
-//     bname = bname.replace("_centroid", "")
-//     if (bname.contains('__'))
-//     {
-//         bname = bname.substring(bname.lastIndexOf("__") + 2)
-//     }
-//     """
-//     scil_resample_streamlines.py $bundle "${sid}__${bname}__centroid.trk" --nb_pts_per_streamline $params.nb_points
-//     """
-// }
-
-// if (params.use_provided_centroids) {
-//     centroids_provided
-//         .into{centroid_for_label_and_distance_map; centroid_for_volume_per_label;lol}
-// }
-// else {
-//     centroids_computed
-//         .into{centroid_for_label_and_distance_map; centroid_for_volume_per_label;lol}
-// }
-
-// outlier_rejected_bundle_for_label_and_distance_map
+// bundle_for_label_and_distance_map
 //     .phase(centroid_for_label_and_distance_map)
 //         {it -> it[0] + it[1] }
 //     .map{ch1, ch2 -> [*ch1, ch2[2]]}
-//     .set{bundle_outlier_rejected_and_centroid_for_label_and_distance_map}
+//     .set{bundle_and_centroid_for_label_and_distance_map}
 
 // process Bundle_Label_And_Distance_Maps {
 //     input:
 //     set sid, bname, file(bundle), file(centroid) from\
-//         bundle_outlier_rejected_and_centroid_for_label_and_distance_map
+//         bundle_and_centroid_for_label_and_distance_map
 
 //     output:
 //     set sid, val(bname), "${sid}__${bname}__labels.npz",
@@ -291,7 +325,7 @@ process Color_Bundle {
 
 // process Bundle_Volume {
 //     input:
-//     set sid, bname, file(bundle) from outlier_rejected_bundle_for_volume
+//     set sid, bname, file(bundle) from bundle_for_volume
 
 //     output:
 //     set sid, val(bname), "${sid}__${bname}__volume.json" into\
@@ -310,7 +344,7 @@ process Color_Bundle {
 
 // process Bundle_streamline_count {
 //     input:
-//     set sid, bname, file(bundle) from outlier_rejected_bundle_for_streamline_count
+//     set sid, bname, file(bundle) from bundle_for_streamline_count
 
 //     output:
 //     set sid, val(bname), "${sid}__${bname}__streamline_count.json" into\
@@ -327,7 +361,7 @@ process Color_Bundle {
 //     """
 // }
 
-// outlier_rejected_bundle_for_volume_per_label
+// bundle_for_volume_per_label
 //     .phase(centroid_for_volume_per_label)
 //         {it -> it[0] + it[1]}
 //     .map{ch1, ch2 -> [*ch1, ch2[2]]}
@@ -371,7 +405,7 @@ process Color_Bundle {
 //     """
 // }
 
-// outlier_rejected_bundle_for_mean_std_per_point
+// bundle_for_mean_std_per_point
 //     .phase(label_distance_maps_for_mean_std_per_point)
 //         {it -> it[0] + it[1]}
 //     .map{ch1, ch2 -> [*ch1, *ch2[2..3]]}

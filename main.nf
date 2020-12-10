@@ -47,7 +47,7 @@ workflow.onComplete {
 Channel
     .fromFilePairs("$params.input/**/bundles/*.trk",
                    size: -1) { it.parent.parent.name }
-    .into{bundles_for_coloring;bundles_for_centroids}
+    .into{bundles_for_uniformize;bundles_for_centroids}
 
 Channel
     .fromFilePairs("$params.input/**/metrics/*.nii.gz",
@@ -69,7 +69,7 @@ process Bundle_Centroid {
     set sid, file(bundles) from bundles_for_centroids
 
     output:
-    set sid, "*_centroid.trk" into centroids_computed
+    set sid, "*_centroid_${$params.nb_points}.trk" into centroids_computed
 
     when:
     !params.use_provided_centroids
@@ -85,9 +85,10 @@ process Bundle_Centroid {
         else
             bname=\$(basename \$bundle .trk)
         fi
+        bname=\${bname/$params.bundle_suffix_to_remove/}
     
         scil_compute_centroid.py \$bundle centroid.trk --nb_points $params.nb_points -f
-        scil_uniformize_streamlines_endpoints.py centroid.trk ${sid}__\${bname}_centroid.trk --auto
+        scil_uniformize_streamlines_endpoints.py centroid.trk ${sid}__\${bname}_centroid_${params.nb_points}.trk --auto
     done
     """
 }
@@ -97,7 +98,7 @@ process Resample_Centroid {
     set sid, file(bundles) from centroids_for_resample
 
     output:
-    set sid, "${sid}__*_centroid.trk" into centroids_provided
+    set sid, "${sid}__*_centroid_${params.nb_points}.trk" into centroids_provided
 
     when:
     params.use_provided_centroids
@@ -113,8 +114,9 @@ process Resample_Centroid {
         else
             bname=\$(basename \$bundle .trk)
         fi
-    
-        scil_resample_streamlines.py \$bundle "${sid}__\${bname}_centroid.trk" --nb_pts_per_streamline $params.nb_points
+        bname=\${bname/_centroid/}
+
+        scil_resample_streamlines.py \$bundle "${sid}__\${bname}_centroid_${params.nb_points}.trk" --nb_pts_per_streamline $params.nb_points -f
     done
     """
 }
@@ -128,16 +130,45 @@ else {
         .into{centroids_for_label_and_distance_map; centroids_for_volume_per_label;lol}
 }
 
+process Uniformize_Bundle {
+    input:
+    set sid, file(bundles) from bundles_for_uniformize
+
+    output:
+    set sid, "*_uniformized.trk" into bundles_for_coloring
+    set sid, "*_uniformized.trk" into bundles_for_mean_std, bundles_for_endpoints_map,
+             bundles_for_endpoints_metrics, bundles_for_centroid,
+             bundles_for_label_and_distance_map, bundles_for_volume,
+             bundles_for_streamline_count, bundles_for_volume_per_label,
+             bundles_for_mean_std_per_point, bundles_for_length_stats
+
+    script:
+    String bundles_list = bundles.join(", ").replace(',', '')
+    """
+    for bundle in $bundles_list; do
+        # Uniformize the bundle orientation as well as simplifying filename convention
+        if [[ \$bundle == *"__"* ]]; then
+            scil_uniformize_streamlines_endpoints.py \$bundle \
+                \${bundle/.trk/_uniformized.trk} --auto -f
+        else
+            scil_uniformize_streamlines_endpoints.py \$bundle \
+                ${sid}__\${bundle/.trk/_uniformized.trk} --auto -f
+        fi
+    done
+
+    # Remove suffix from RecobundlesX if present
+    for bundle in *_uniformized.trk; do
+        mv \$bundle \${bundle/$params.bundle_suffix_to_remove/}
+    done
+    """
+}
+
 process Color_Bundle {
     input:
     set sid, file(bundles) from bundles_for_coloring
 
     output:
-    set sid, "*_colored.trk" into bundles_for_mean_std, bundles_for_endpoints_map,
-             bundles_for_endpoints_metrics, bundles_for_centroid,
-             bundles_for_label_and_distance_map, bundles_for_volume,
-             bundles_for_streamline_count, bundles_for_volume_per_label,
-             bundles_for_mean_std_per_point, bundles_for_length_stats
+    file "*_colored.trk"
 
     script:
     def json_str = JsonOutput.toJson(params.colors)
@@ -145,14 +176,6 @@ process Color_Bundle {
     """
     echo '$json_str' >> colors.json
     scil_assign_color_to_trk.py $bundles_list --dict_colors colors.json
-    for bundle in *_colored.trk; do
-        if [[ \$bundle == *"__"* ]]; then
-            scil_uniformize_streamlines_endpoints.py \$bundle \$bundle --auto -f
-        else
-            scil_uniformize_streamlines_endpoints.py \$bundle ${sid}__\$bundle --auto -f
-            rm \$bundle
-        fi
-    done
     """
 }
 
@@ -174,7 +197,7 @@ process Bundle_Length_Stats {
         else
             bname=\$(basename \$bundle .trk)
         fi
-        bname=\${bname/_colored/}
+        bname=\${bname/_uniformized/}
         scil_compute_streamlines_length_stats.py \$bundle > \$bname.json
         done
 
@@ -202,7 +225,7 @@ process Bundle_Endpoints_Map {
         else
             bname=\$(basename \$bundle .trk)
         fi
-        bname=\${bname/_colored/}
+        bname=\${bname/_uniformized/}
         mv \$bundle \$bname.trk
 
         scil_compute_endpoints_map.py \$bname.trk ${sid}__\${bname}_endpoints_map_head.nii.gz \
@@ -274,7 +297,7 @@ process Bundle_Endpoints_Metrics {
         else
             bname=\$(basename \$bundle .trk)
         fi
-        bname=\${bname/_colored/}
+        bname=\${bname/_uniformized/}
         mkdir \${bname}
 
         scil_compute_endpoints_metric.py \$bundle $metrics \${bname}
@@ -309,7 +332,7 @@ process Bundle_Mean_Std {
         else
             bname=\$(basename \$bundle .trk)
         fi
-        bname=\${bname/_colored/}
+        bname=\${bname/_uniformized/}
         mv \$bundle \$bname.trk
         scil_compute_bundle_mean_std.py $density_weighting \$bname.trk $metrics >\
             \${bname}.json
@@ -342,8 +365,8 @@ process Bundle_Label_And_Distance_Maps {
         else
             bname=\$(basename \$bundle .trk)
         fi
-        bname=\${bname/_colored/}
-        centroid=\${bundle/_colored/_centroid}
+        bname=\${bname/_uniformized/}
+        centroid=\${bundle/_uniformized/_centroid_${params.nb_points}}
         scil_label_and_distance_maps.py \$bundle \$centroid\
             ${sid}__\${bname}_labels.npz ${sid}__\${bname}_distances.npz
         done
@@ -368,7 +391,7 @@ process Bundle_Volume {
         else
             bname=\$(basename \$bundle .trk)
         fi
-        bname=\${bname/_colored/}
+        bname=\${bname/_uniformized/}
         mv \$bundle \$bname.trk
         scil_compute_bundle_volume.py \$bname.trk > \${bname}.json
     done
@@ -394,7 +417,7 @@ process Bundle_Streamline_Count {
         else
             bname=\$(basename \$bundle .trk)
         fi
-        bname=\${bname/_colored/}
+        bname=\${bname/_uniformized/}
         mv \$bundle \$bname.trk
         scil_count_streamlines.py \$bname.trk > \${bname}.json
     done
@@ -425,8 +448,8 @@ process Bundle_Voxel_Label_Map {
         else
             bname=\$(basename \$bundle .trk)
         fi
-        bname=\${bname/_colored/}
-        centroid=\${bundle/_colored/_centroid}
+        bname=\${bname/_uniformized/}
+        centroid=\${bundle/_uniformized/_centroid_${params.nb_points}}
         scil_compute_bundle_voxel_label_map.py  \$bundle \$centroid \
             ${sid}__\${bname}_voxel_label_map.nii.gz
     done
@@ -489,7 +512,7 @@ process Bundle_Mean_Std_Per_Point {
         else
             bname=\$(basename \$bundle .trk)
         fi
-        bname=\${bname/_colored/}
+        bname=\${bname/_uniformized/}
         mv \$bundle \$bname.trk
         label_map=${sid}__\${bname}_labels.npz
         distance_map=${sid}__\${bname}_labels.npz

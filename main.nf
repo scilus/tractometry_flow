@@ -290,37 +290,44 @@ process Bundle_Metrics_Stats_In_Endpoints {
     """
 }
 
-metrics_for_endpoints_metrics
-    .combine(bundles_for_endpoints_metrics, by: 0)
+// metrics_for_endpoints_metrics
+//     .combine(bundles_for_endpoints_metrics, by: 0)
+//     .set{metrics_bundles_for_endpoints_metrics}
+// identity_native_streamlines_for_analysis
+    // .flatMap{participant, sid, trks -> trks.collect{
+    //     [participant, sid, it.name.replace("_identity_native.trk", ""), it]}}
+    // .set{identity_native_streamlines_for_analysis_split}
+
+bundles_for_endpoints_metrics
+    .flatMap{ sid, bundles -> bundles.collect{[sid, it]} }
+    .combine(metrics_for_endpoints_metrics, by: 0)
     .set{metrics_bundles_for_endpoints_metrics}
 
 process Bundle_Endpoints_Metrics {
     input:
-    set sid, file(metrics), file(bundles) from metrics_bundles_for_endpoints_metrics
+    set sid, file(bundle), file(metrics) from metrics_bundles_for_endpoints_metrics
 
     output:
     file "*/*_endpoints_metric.nii.gz"
 
     script:
-    String bundles_list = bundles.join(", ").replace(',', '')
     """
-    for bundle in $bundles_list;
-        do if [[ \$bundle == *"__"* ]]; then
-            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
-            bname=\${bundle:\$pos}
-            bname=\$(basename \$bname .trk)
-        else
-            bname=\$(basename \$bundle .trk)
-        fi
-        bname=\${bname/_uniformized/}
-        mkdir \${bname}
+    bundle=$bundle
+    if [[ \$bundle == *"__"* ]]; then
+        pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
+        bname=\${bundle:\$pos}
+        bname=\$(basename \$bname .trk)
+    else
+        bname=\$(basename \$bundle .trk)
+    fi
+    bname=\${bname/_uniformized/}
+    mkdir \${bname}
 
-        scil_compute_endpoints_metric.py \$bundle $metrics \${bname}
-        cd \${bname}
-        for i in *.nii.gz; do mv "\$i" "${sid}__\$i"; done
-        rename s/${sid}__${sid}__/${sid}__/ *
-        cd ../
-    done
+    scil_compute_endpoints_metric.py \$bundle $metrics \${bname}
+    cd \${bname}
+    for i in *.nii.gz; do mv "\$i" "${sid}__\$i"; done
+    rename s/${sid}__${sid}__/${sid}__/ *
+
     """
 }
 

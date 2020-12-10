@@ -131,18 +131,20 @@ process Resample_Centroid {
         fi
         bname=\${bname/_centroid/}
 
-        scil_resample_streamlines.py \$bundle "${sid}__\${bname}_centroid_${params.nb_points}.trk" --nb_pts_per_streamline $params.nb_points -f
+        scil_resample_streamlines.py \$bundle \
+            "${sid}__\${bname}_centroid_${params.nb_points}.trk" \
+            --nb_pts_per_streamline $params.nb_points -f
     done
     """
 }
 
 if (params.use_provided_centroids) {
     centroids_provided
-        .into{centroids_for_label_and_distance_map; centroids_for_volume_per_label;lol}
+        .into{centroids_for_label_and_distance_map;centroids_for_volume_per_label}
 }
 else {
     centroids_computed
-        .into{centroids_for_label_and_distance_map; centroids_for_volume_per_label;lol}
+        .into{centroids_for_label_and_distance_map;centroids_for_volume_per_label}
 }
 
 process Uniformize_Bundle {
@@ -161,7 +163,8 @@ process Uniformize_Bundle {
     String bundles_list = bundles.join(", ").replace(',', '')
     """
     for bundle in $bundles_list; do
-        # Uniformize the bundle orientation as well as simplifying filename convention
+        # Uniformize the bundle orientation as well as simplifying
+        # filename convention
         if [[ \$bundle == *"__"* ]]; then
             scil_uniformize_streamlines_endpoints.py \$bundle \
                 \${bundle/.trk/_uniformized.trk} --auto -f
@@ -199,7 +202,7 @@ process Bundle_Length_Stats {
     set sid, file(bundles) from bundles_for_length_stats
 
     output:
-    file "${sid}__length_stats.json" into bundle_length_stats_to_aggregate
+    file "${sid}__length_stats.json" into bundles_length_stats_to_aggregate
 
     script:
     String bundles_list = bundles.join(", ").replace(',', '')
@@ -216,7 +219,8 @@ process Bundle_Length_Stats {
         scil_compute_streamlines_length_stats.py \$bundle > \$bname.json
         done
 
-        scil_merge_json.py *.json ${sid}__length_stats.json --add_parent_key ${sid} --keep_separate
+        scil_merge_json.py *.json ${sid}__length_stats.json --add_parent_key ${sid} \
+            --keep_separate
     """
 }
 
@@ -225,9 +229,9 @@ process Bundle_Endpoints_Map {
     set sid, file(bundles) from bundles_for_endpoints_map
 
     output:
-    file "${sid}__endpoints_map_raw.json" into endpoints_map_to_aggregate
+    file "${sid}__endpoints_map_raw.json" into endpoints_maps_to_aggregate
     set sid, "*_endpoints_map_head.nii.gz", "*_endpoints_map_tail.nii.gz" \
-        into endpoints_map_for_roi_stats
+        into endpoints_maps_for_roi_stats
 
     script:
     String bundles_list = bundles.join(", ").replace(',', '')
@@ -243,15 +247,17 @@ process Bundle_Endpoints_Map {
         bname=\${bname/_uniformized/}
         mv \$bundle \$bname.trk
 
-        scil_compute_endpoints_map.py \$bname.trk ${sid}__\${bname}_endpoints_map_head.nii.gz \
+        scil_compute_endpoints_map.py \$bname.trk \
+            ${sid}__\${bname}_endpoints_map_head.nii.gz \
             ${sid}__\${bname}_endpoints_map_tail.nii.gz >\
-                ${sid}__\${bname}_endpoints_map_raw.json
+            ${sid}__\${bname}_endpoints_map_raw.json
     done
-    scil_merge_json.py *_endpoints_map_raw.json ${sid}__endpoints_map_raw.json --no_list --add_parent_key ${sid}
+    scil_merge_json.py *_endpoints_map_raw.json ${sid}__endpoints_map_raw.json \
+        --no_list --add_parent_key ${sid}
     """
 }
 metrics_for_endpoints_roi_stats
-    .combine(endpoints_map_for_roi_stats, by: 0)
+    .combine(endpoints_maps_for_roi_stats, by: 0)
     .set{metrics_endpoints_for_roi_stats}
 
 process Bundle_Metrics_Stats_In_Endpoints {
@@ -286,7 +292,8 @@ process Bundle_Metrics_Stats_In_Endpoints {
             --metrics $metrics > \${bname}_tail.json
     done
 
-    scil_merge_json.py *_tail.json *_head.json ${sid}__endpoints_metric_stats.json --no_list --add_parent_key ${sid}
+    scil_merge_json.py *_tail.json *_head.json ${sid}__endpoints_metric_stats.json \
+        --no_list --add_parent_key ${sid}
     """
 }
 
@@ -395,7 +402,7 @@ process Bundle_Volume {
     set sid, file(bundles) from bundles_for_volume
 
     output:
-    file "${sid}__volume.json" into volume_to_aggregate
+    file "${sid}__volume.json" into volumes_to_aggregate
 
     script:
     String bundles_list = bundles.join(", ").replace(',', '')
@@ -421,7 +428,7 @@ process Bundle_Streamline_Count {
     set sid, file(bundles) from bundles_for_streamline_count
 
     output:
-    file "${sid}__streamline_count.json" into streamline_count_to_aggregate
+    file "${sid}__streamline_count.json" into streamline_counts_to_aggregate
 
     script:
     String bundles_list = bundles.join(", ").replace(',', '')
@@ -438,7 +445,8 @@ process Bundle_Streamline_Count {
         mv \$bundle \$bname.trk
         scil_count_streamlines.py \$bname.trk > \${bname}.json
     done
-    scil_merge_json.py *.json ${sid}__streamline_count.json --no_list --add_parent_key ${sid}
+    scil_merge_json.py *.json ${sid}__streamline_count.json --no_list \
+        --add_parent_key ${sid}
     """
 }
 
@@ -478,7 +486,7 @@ process Bundle_Volume_Per_Label {
     set sid, file(voxel_label_maps) from voxel_label_maps_for_volume
 
     output:
-    file "${sid}__volume_per_label.json" into volume_per_label_to_aggregate
+    file "${sid}__volume_per_label.json" into volumes_per_label_to_aggregate
 
     script:
     String maps_list = voxel_label_maps.join(", ").replace(',', '')
@@ -496,7 +504,8 @@ process Bundle_Volume_Per_Label {
         scil_compute_bundle_volume_per_label.py \$map \$bname --sort_keys >\
             \${bname}.json
         done
-    scil_merge_json.py *.json ${sid}__volume_per_label.json --no_list --add_parent_key ${sid}
+    scil_merge_json.py *.json ${sid}__volume_per_label.json --no_list \
+        --add_parent_key ${sid}
     """
 }
 
@@ -537,7 +546,8 @@ process Bundle_Mean_Std_Per_Point {
         scil_compute_bundle_mean_std_per_point.py \$bname.trk \$label_map \$distance_map \
             $metrics --sort_keys $density_weighting > \$bname.json
         done
-        scil_merge_json.py *.json ${sid}__mean_std_per_point.json --no_list --add_parent_key ${sid}
+        scil_merge_json.py *.json ${sid}__mean_std_per_point.json --no_list \
+            --add_parent_key ${sid}
     """
 }
 
@@ -552,12 +562,13 @@ process Plot_Mean_Std_Per_Point {
     def json_str = JsonOutput.toJson(params.colors)
     """
     echo '$json_str' >> colors.json
-    scil_plot_mean_std_per_point.py $mean_std_per_point tmp_dir/ --dict_colors colors.json
+    scil_plot_mean_std_per_point.py $mean_std_per_point tmp_dir/ --dict_colors \
+        colors.json
     mv tmp_dir/* ./
     """
 }
 
-endpoints_map_to_aggregate
+endpoints_maps_to_aggregate
     .collect()
     .set{all_aggregate_endspoints_map}
 
@@ -599,7 +610,7 @@ process Aggregate_All_Endpoints_Metric_Stats {
     """
 }
 
-bundle_length_stats_to_aggregate
+bundles_length_stats_to_aggregate
     .collect()
     .set{all_bundle_length_stats_to_aggretate}
 
@@ -642,16 +653,16 @@ process Aggregate_All_mean_std {
     """
 }
 
-volume_to_aggregate
+volumes_to_aggregate
     .collect()
-    .set{all_volume_to_aggregate}
+    .set{all_volumes_to_aggregate}
 
 process Aggregate_All_Volume {
     tag = { "Statistics" }
     publishDir = params.statsPublishDir
 
     input:
-    file jsons from all_volume_to_aggregate
+    file jsons from all_volumes_to_aggregate
 
     output:
     file "volumes.json"
@@ -663,16 +674,16 @@ process Aggregate_All_Volume {
     """
 }
 
-streamline_count_to_aggregate
+streamline_counts_to_aggregate
     .collect()
-    .set{all_streamline_count_to_aggregate}
+    .set{all_streamline_counts_to_aggregate}
 
 process Aggregate_All_streamline_count {
     tag = { "Statistics" }
     publishDir = params.statsPublishDir
 
     input:
-    file jsons from all_streamline_count_to_aggregate
+    file jsons from all_streamline_counts_to_aggregate
 
     output:
     file "streamline_count.json"
@@ -684,16 +695,16 @@ process Aggregate_All_streamline_count {
     """
 }
 
-volume_per_label_to_aggregate
+volumes_per_label_to_aggregate
     .collect()
-    .set{all_volume_per_label_to_aggregate}
+    .set{all_volumes_per_label_to_aggregate}
 
 process Aggregate_All_Volume_Per_Label {
     tag = { "Statistics" }
     publishDir = params.statsPublishDir
 
     input:
-    file jsons from all_volume_per_label_to_aggregate
+    file jsons from all_volumes_per_label_to_aggregate
 
     output:
     file "volume_per_label.json"
@@ -742,7 +753,8 @@ process Plot_Population_Mean_Std_Per_Point {
     def json_str = JsonOutput.toJson(params.colors)
     """
     echo '$json_str' >> colors.json
-    scil_plot_mean_std_per_point.py $json tmp_dir/ --dict_colors colors.json --stats_over_population
+    scil_plot_mean_std_per_point.py $json tmp_dir/ --dict_colors colors.json \
+        --stats_over_population
     mv tmp_dir/* ./
     """
 }

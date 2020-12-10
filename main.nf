@@ -290,14 +290,6 @@ process Bundle_Metrics_Stats_In_Endpoints {
     """
 }
 
-// metrics_for_endpoints_metrics
-//     .combine(bundles_for_endpoints_metrics, by: 0)
-//     .set{metrics_bundles_for_endpoints_metrics}
-// identity_native_streamlines_for_analysis
-    // .flatMap{participant, sid, trks -> trks.collect{
-    //     [participant, sid, it.name.replace("_identity_native.trk", ""), it]}}
-    // .set{identity_native_streamlines_for_analysis_split}
-
 bundles_for_endpoints_metrics
     .flatMap{ sid, bundles -> bundles.collect{[sid, it]} }
     .combine(metrics_for_endpoints_metrics, by: 0)
@@ -309,6 +301,9 @@ process Bundle_Endpoints_Metrics {
 
     output:
     file "*/*_endpoints_metric.nii.gz"
+
+    when:
+    !params.skip_projection_endpoints_metrics
 
     script:
     """

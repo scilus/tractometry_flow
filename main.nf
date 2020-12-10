@@ -59,10 +59,25 @@ Channel
         size: -1) { it.parent.parent.name }
     .into{centroids_for_resample; in_centroids_check}
 
-in_metrics.into{metrics_for_mean_std;
-                metrics_for_endpoints_metrics; metrics_for_endpoints_roi_stats;
-                metrics_for_volume;
-                metrics_for_mean_std_per_point}
+in_metrics
+    .set{metrics_for_rename}
+
+process Rename_Metrics {
+    input:
+    set sid, file(metrics) from metrics_for_rename
+
+    output:
+    set sid, "*_metric.nii.gz" into metrics_for_mean_std,
+        metrics_for_endpoints_metrics, metrics_for_endpoints_roi_stats,
+        metrics_for_volume, metrics_for_mean_std_per_point
+
+    script:
+    """
+    for metric in *.nii.gz; do
+        mv \$metric \$(basename \${metric/${sid}__/} .nii.gz)_metric.nii.gz
+    done
+    """
+}
 
 process Bundle_Centroid {
     input:

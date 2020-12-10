@@ -121,11 +121,11 @@ process Resample_Centroid {
 
 if (params.use_provided_centroids) {
     centroids_provided
-        .into{centroid_for_label_and_distance_map; centroid_for_volume_per_label;lol}
+        .into{centroids_for_label_and_distance_map; centroids_for_volume_per_label;lol}
 }
 else {
     centroids_computed
-        .into{centroid_for_label_and_distance_map; centroid_for_volume_per_label;lol}
+        .into{centroids_for_label_and_distance_map; centroids_for_volume_per_label;lol}
 }
 
 process Color_Bundle {
@@ -144,9 +144,14 @@ process Color_Bundle {
     String bundles_list = bundles.join(", ").replace(',', '')
     """
     echo '$json_str' >> colors.json
-    scil_assign_color_to_trk.py $bundles_list --colors_dict colors.json
-    for i in *_colored.trk; do
-        scil_uniformize_streamlines_endpoints.py \$i \$i --auto -f
+    scil_assign_color_to_trk.py $bundles_list --dict_colors colors.json
+    for bundle in *_colored.trk; do
+        if [[ \$bundle == *"__"* ]]; then
+            scil_uniformize_streamlines_endpoints.py \$bundle \$bundle --auto -f
+        else
+            scil_uniformize_streamlines_endpoints.py \$bundle ${sid}__\$bundle --auto -f
+            rm \$bundle
+        fi
     done
     """
 }
@@ -173,7 +178,7 @@ process Bundle_Length_Stats {
         scil_compute_streamlines_length_stats.py \$bundle > \$bname.json
         done
 
-        scil_merge_json.py *.json ${sid}__length_stats.json --parent_key ${sid} --keep_separate
+        scil_merge_json.py *.json ${sid}__length_stats.json --add_parent_key ${sid} --keep_separate
     """
 }
 
@@ -200,267 +205,319 @@ process Bundle_Endpoints_Map {
         bname=\${bname/_colored/}
         mv \$bundle \$bname.trk
 
-        scil_endpoints_map.py \$bname.trk ${sid}__\${bname}_endpoints_map_head.nii.gz \
+        scil_compute_endpoints_map.py \$bname.trk ${sid}__\${bname}_endpoints_map_head.nii.gz \
             ${sid}__\${bname}_endpoints_map_tail.nii.gz >\
                 ${sid}__\${bname}_endpoints_map_raw.json
     done
-    scil_merge_json.py *_endpoints_map_raw.json ${sid}__endpoints_map_raw.json --no_list --parent_key ${sid}
+    scil_merge_json.py *_endpoints_map_raw.json ${sid}__endpoints_map_raw.json --no_list --add_parent_key ${sid}
+    """
+}
+metrics_for_endpoints_roi_stats
+    .combine(endpoints_map_for_roi_stats, by: 0)
+    .set{metrics_endpoints_for_roi_stats}
+
+process Bundle_Metrics_Stats_In_Endpoints {
+    input:
+    set sid, file(metrics), file(endpoints_map_head), file(endpoints_map_tail) \
+         from metrics_endpoints_for_roi_stats
+
+    output:
+    set sid, "${sid}__endpoints_metric_stats.json" into\
+        endpoints_metric_stats_to_aggregate
+
+    script:
+    normalize_weights =\
+        params.endpoints_metric_stats_normalize_weights ?\
+            '--normalize_weights' : '--bin'
+    String map_list = endpoints_map_head.join(", ").replace(',', '')
+    """
+    for map in $map_list;
+        do if [[ \$map == *"__"* ]]; then
+            pos=\$((\$(echo \$map | grep -b -o __ | cut -d: -f1)+2))
+            bname=\${map:\$pos}
+            bname=\$(basename \$bname .nii.gz)
+        else
+            bname=\$(basename \$map .nii.gz)
+        fi
+        bname=\${bname/_endpoints_map_head/}
+        mv \$map \${bname}_head.nii.gz
+        mv \${map/_head/_tail} \${bname}_tail.nii.gz
+
+        scil_compute_metrics_stats_in_ROI.py \${bname}_head.nii.gz $normalize_weights\
+            --metrics $metrics > \${bname}_head.json
+        scil_compute_metrics_stats_in_ROI.py \${bname}_tail.nii.gz $normalize_weights\
+            --metrics $metrics > \${bname}_tail.json
+    done
+
+    scil_merge_json.py *_tail.json *_head.json ${sid}__endpoints_metric_stats.json --no_list --add_parent_key ${sid}
     """
 }
 
-// metrics_for_endpoints_roi_stats
-//     .cross(endpoints_map_for_roi_stats)
-//     .map{ch1, ch2 -> [*ch2, *ch1[1..-1]]}
-//     .set{in_endpoints_roi_stats}
+metrics_for_endpoints_metrics
+    .combine(bundles_for_endpoints_metrics, by: 0)
+    .set{metrics_bundles_for_endpoints_metrics}
 
-// process Bundle_Metrics_Stats_In_Endpoints {
-//     input:
-//     set sid, val(bname), file(endpoints_map_head), file(endpoints_map_tail),
-//         file(metrics) from in_endpoints_roi_stats
+process Bundle_Endpoints_Metrics {
+    input:
+    set sid, file(metrics), file(bundles) from metrics_bundles_for_endpoints_metrics
 
-//     output:
-//     set sid, val(bname), "${sid}__${bname}__endpoints_metric_stats.json" into\
-//         endpoints_metric_stats_to_aggregate
+    output:
+    file "*/*_endpoints_metric.nii.gz"
 
-//     script:
-//     normalize_weights =\
-//         params.endpoints_metric_stats_normalize_weights ?\
-//             '--normalize_weights' : '--bin'
-//     """
-//     scil_compute_metrics_stats_in_ROI.py $endpoints_map_head $normalize_weights\
-//         --metrics $metrics\
-//         > ${sid}__${bname}__endpoints_head_metric_stats_raw.json
-//     scil_compute_metrics_stats_in_ROI.py $endpoints_map_tail $normalize_weights\
-//         --metrics $metrics\
-//         > ${sid}__${bname}__endpoints_tail_metric_stats_raw.json
-//     jq 'to_entries|map({(.key|ltrimstr("${sid}__")|\
-//                          sub("__endpoints_map"; "")):.value})|\
-//         reduce .[] as \$item ({}; . + \$item)|\
-//         {"${sid}": .}' ${sid}__${bname}__endpoints_head_metric_stats_raw.json\
-//             ${sid}__${bname}__endpoints_tail_metric_stats_raw.json >\
-//             ${sid}__${bname}__endpoints_metric_stats_raw.json
-//     cat ${sid}__${bname}__endpoints_metric_stats_raw.json |\
-//         jq -s '[.[] | to_entries] | flatten |\
-//             reduce .[] as \$dot ({}; .[\$dot.key] += \$dot.value)' >\
-//         ${sid}__${bname}__endpoints_metric_stats.json
-//     """
-// }
+    script:
+    String bundles_list = bundles.join(", ").replace(',', '')
+    """
+    for bundle in $bundles_list;
+        do if [[ \$bundle == *"__"* ]]; then
+            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
+            bname=\${bundle:\$pos}
+            bname=\$(basename \$bname .trk)
+        else
+            bname=\$(basename \$bundle .trk)
+        fi
+        bname=\${bname/_colored/}
+        mkdir \${bname}
 
-// metrics_for_endpoints_metrics
-//     .cross(bundle_for_endpoints_metrics)
-//     .map{ch1, ch2 -> [*ch2, *ch1[1..-1]]}
-//     .set{in_endpoints_metrics}
+        scil_compute_endpoints_metric.py \$bundle $metrics \${bname}
+        cd \${bname}
+        for i in *.nii.gz; do mv "\$i" "${sid}__\$i"; done
+        rename s/${sid}__${sid}__/${sid}__/ *
+        cd ../
+    done
+    """
+}
 
-// process Bundle_Endpoints_Metrics {
-//     input:
-//     set sid, bname, file(bundle), file(metrics) from in_endpoints_metrics
+metrics_for_mean_std
+    .combine(bundles_for_mean_std, by: 0)
+    .set{metrics_bundles_for_mean_std}
+process Bundle_Mean_Std {
+    input:
+    set sid, file(metrics), file(bundles) from metrics_bundles_for_mean_std
 
-//     output:
-//     file "${bname}/${sid}__*endpoints_metric.nii.gz"
+    output:
+    set sid, "${sid}__mean_std.json" into mean_std_to_aggregate
 
-//     script:
-//     """
-//     mkdir ${bname}
-//     scil_endpoints_metric.py $bundle $metrics ${bname}
-//     cd ${bname}
-//     for i in *.nii.gz; do mv "\$i" "${sid}__\$i"; done
-//     rename s/${sid}__${sid}__/${sid}__/ *
-//     """
-// }
+    script:
+    density_weighting =\
+        params.mean_std_density_weighting ? '--density_weighting' : ''
+    String bundles_list = bundles.join(", ").replace(',', '')
+    """
+    for bundle in $bundles_list;
+        do if [[ \$bundle == *"__"* ]]; then
+            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
+            bname=\${bundle:\$pos}
+            bname=\$(basename \$bname .trk)
+        else
+            bname=\$(basename \$bundle .trk)
+        fi
+        bname=\${bname/_colored/}
+        mv \$bundle \$bname.trk
+        scil_compute_bundle_mean_std.py $density_weighting \$bname.trk $metrics >\
+            \${bname}.json
+    done
+    scil_merge_json.py *.json ${sid}__mean_std.json --no_list --add_parent_key ${sid}
+    """
+}
 
-// metrics_for_mean_std
-//     .cross(bundle_for_mean_std)
-//     .map{ch1, ch2 -> [*ch2, *ch1[1..-1]]}
-//     .set{in_bundle_mean_std}
+bundles_for_label_and_distance_map
+    .join(centroids_for_label_and_distance_map, by: 0)
+    .set{bundles_centroids_for_label_and_distance_map}
 
-// process Bundle_Mean_Std {
-//     input:
-//     set sid, bname, file(bundle), file(metrics) from in_bundle_mean_std
+process Bundle_Label_And_Distance_Maps {
+    input:
+    set sid, file(bundles), file(centroids) from\
+        bundles_centroids_for_label_and_distance_map
 
-//     output:
-//     set sid, val(bname), "${sid}__${bname}__mean_std.json" into\
-//         mean_std_to_aggregate
+    output:
+    set sid, "${sid}__*_labels.npz", "${sid}__*_distances.npz" into\
+        label_distance_maps_for_mean_std_per_point
 
-//     script:
-//     density_weighting =\
-//         params.mean_std_density_weighting ? '--density_weighting' : ''
-//     """
-//     scil_compute_bundle_mean_std.py $density_weighting $bundle $metrics >\
-//         ${sid}__${bname}__mean_std_raw.json
-//     jq 'to_entries|map({(.key|ltrimstr("${sid}__")|\
-//                          rtrimstr("__outliers_removed_colored")):.value})|\
-//         reduce .[] as \$item ({}; . + \$item)|\
-//         {"${sid}": .}' ${sid}__${bname}__mean_std_raw.json >\
-//             ${sid}__${bname}__mean_std.json
+    script:
+    String bundles_list = bundles.join(", ").replace(',', '')
+    """
+    for bundle in $bundles_list;
+        do if [[ \$bundle == *"__"* ]]; then
+            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
+            bname=\${bundle:\$pos}
+            bname=\$(basename \$bname .trk)
+        else
+            bname=\$(basename \$bundle .trk)
+        fi
+        bname=\${bname/_colored/}
+        centroid=\${bundle/_colored/_centroid}
+        scil_label_and_distance_maps.py \$bundle \$centroid\
+            ${sid}__\${bname}_labels.npz ${sid}__\${bname}_distances.npz
+        done
+    """
+}
 
-//     """
-// }
+process Bundle_Volume {
+    input:
+    set sid, file(bundles) from bundles_for_volume
 
+    output:
+    set sid, "${sid}__volume.json" into volume_to_aggregate
 
+    script:
+    String bundles_list = bundles.join(", ").replace(',', '')
+    """
+    for bundle in $bundles_list;
+        do if [[ \$bundle == *"__"* ]]; then
+            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
+            bname=\${bundle:\$pos}
+            bname=\$(basename \$bname .trk)
+        else
+            bname=\$(basename \$bundle .trk)
+        fi
+        bname=\${bname/_colored/}
+        mv \$bundle \$bname.trk
+        scil_compute_bundle_volume.py \$bname.trk > \${bname}.json
+    done
+    scil_merge_json.py *.json ${sid}__volume.json --no_list --add_parent_key ${sid}
+    """
+}
 
+process Bundle_Streamline_Count {
+    input:
+    set sid, file(bundles) from bundles_for_streamline_count
 
+    output:
+    set sid, "${sid}__streamline_count.json" into streamline_count_to_aggregate
 
-// bundle_for_label_and_distance_map
-//     .phase(centroid_for_label_and_distance_map)
-//         {it -> it[0] + it[1] }
-//     .map{ch1, ch2 -> [*ch1, ch2[2]]}
-//     .set{bundle_and_centroid_for_label_and_distance_map}
+    script:
+    String bundles_list = bundles.join(", ").replace(',', '')
+    """
+    for bundle in $bundles_list;
+        do if [[ \$bundle == *"__"* ]]; then
+            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
+            bname=\${bundle:\$pos}
+            bname=\$(basename \$bname .trk)
+        else
+            bname=\$(basename \$bundle .trk)
+        fi
+        bname=\${bname/_colored/}
+        mv \$bundle \$bname.trk
+        scil_count_streamlines.py \$bname.trk > \${bname}.json
+    done
+    scil_merge_json.py *.json ${sid}__streamline_count.json --no_list --add_parent_key ${sid}
+    """
+}
 
-// process Bundle_Label_And_Distance_Maps {
-//     input:
-//     set sid, bname, file(bundle), file(centroid) from\
-//         bundle_and_centroid_for_label_and_distance_map
+bundles_for_volume_per_label
+    .join(centroids_for_volume_per_label)
+    .set{bundles_centroids_voxel_label_map}
 
-//     output:
-//     set sid, val(bname), "${sid}__${bname}__labels.npz",
-//         "${sid}__${bname}__distances.npz" into\
-//         label_distance_maps_for_mean_std_per_point
+process Bundle_Voxel_Label_Map {
+    input:
+    set sid, file(bundles), file(centroid) from\
+        bundles_centroids_voxel_label_map
 
-//     script:
-//     """
-//     scil_label_and_distance_maps.py $bundle $centroid\
-//         ${sid}__${bname}__labels.npz ${sid}__${bname}__distances.npz
-//     """
-// }
+    output:
+    set sid, "${sid}__*_voxel_label_map.nii.gz" into\
+        voxel_label_maps_for_volume
 
-// process Bundle_Volume {
-//     input:
-//     set sid, bname, file(bundle) from bundle_for_volume
+    script:
+    String bundles_list = bundles.join(", ").replace(',', '')
+    """
+    for bundle in $bundles_list;
+        do if [[ \$bundle == *"__"* ]]; then
+            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
+            bname=\${bundle:\$pos}
+            bname=\$(basename \$bname .trk)
+        else
+            bname=\$(basename \$bundle .trk)
+        fi
+        bname=\${bname/_colored/}
+        centroid=\${bundle/_colored/_centroid}
+        scil_compute_bundle_voxel_label_map.py  \$bundle \$centroid \
+            ${sid}__\${bname}_voxel_label_map.nii.gz
+    done
+    """
+}
 
-//     output:
-//     set sid, val(bname), "${sid}__${bname}__volume.json" into\
-//         volume_to_aggregate
+process Bundle_Volume_Per_Label {
+    input:
+    set sid, file(voxel_label_maps) from voxel_label_maps_for_volume
 
-//     script:
-//     """
-//     scil_compute_bundle_volume.py $bundle > ${sid}__${bname}__volume_raw.json
-//     jq 'to_entries|map({(.key|ltrimstr("${sid}__")|\
-//                          rtrimstr("__outliers_removed_colored")):.value})|\
-//         reduce .[] as \$item ({}; . + \$item)|\
-//         {"${sid}": .}' ${sid}__${bname}__volume_raw.json >\
-//             ${sid}__${bname}__volume.json
-//     """
-// }
+    output:
+    set sid, "${sid}__volume_per_label.json" into volume_per_label_to_aggregate
 
-// process Bundle_streamline_count {
-//     input:
-//     set sid, bname, file(bundle) from bundle_for_streamline_count
+    script:
+    String maps_list = voxel_label_maps.join(", ").replace(',', '')
+    """ 
+    for map in $maps_list;
+        do if [[ \$map == *"__"* ]]; then
+            pos=\$((\$(echo \$map | grep -b -o __ | cut -d: -f1)+2))
+            bname=\${map:\$pos}
+            bname=\$(basename \$bname .nii.gz)
+        else
+            bname=\$(basename \$map .nii.gz)
+        fi
+        bname=\${bname/_voxel_label_map/}
 
-//     output:
-//     set sid, val(bname), "${sid}__${bname}__streamline_count.json" into\
-//         streamline_count_to_aggregate
+        scil_compute_bundle_volume_per_label.py \$map \$bname --sort_keys >\
+            \${bname}.json
+        done
+    scil_merge_json.py *.json ${sid}__volume_per_label.json --no_list --add_parent_key ${sid}
+    """
+}
 
-//     script:
-//     """
-//     scil_count_streamlines.py $bundle > ${sid}__${bname}__streamline_count_raw.json
-//     jq 'to_entries|map({(.key|ltrimstr("${sid}__")|\
-//                          rtrimstr("__outliers_removed_colored")):.value})|\
-//         reduce .[] as \$item ({}; . + \$item)|\
-//         {"${sid}": .}' ${sid}__${bname}__streamline_count_raw.json >\
-//             ${sid}__${bname}__streamline_count.json
-//     """
-// }
+metrics_for_mean_std_per_point
+    .join(bundles_for_mean_std_per_point, by: 0)
+    .join(label_distance_maps_for_mean_std_per_point, by: 0)
+    .set{metrics_bundles_label_distance_maps_for_mean_std_per_point}
 
-// bundle_for_volume_per_label
-//     .phase(centroid_for_volume_per_label)
-//         {it -> it[0] + it[1]}
-//     .map{ch1, ch2 -> [*ch1, ch2[2]]}
-//     .set{in_bundle_voxel_label_map}
+process Bundle_Mean_Std_Per_Point {
+    input:
+    set sid, file(metrics), file(bundles), file(label_maps), file(distance_maps) \
+         from metrics_bundles_label_distance_maps_for_mean_std_per_point
 
-// process Bundle_Voxel_Label_Map {
-//     input:
-//     set sid, bname, file(bundle), file(centroid) from\
-//         in_bundle_voxel_label_map
+    output:
+    set sid, "${sid}__mean_std_per_point.json" into \
+        mean_std_per_point_for_plot
+    file "${sid}__mean_std_per_point.json" into \
+        mean_std_per_point_to_aggregate
 
-//     output:
-//     set sid, val(bname), "${sid}__${bname}__voxel_label_map.nii.gz" into\
-//         voxel_label_map_for_volume
+    script:
+    density_weighting =\
+        params.mean_std_per_point_density_weighting ? '--density_weighting' : ''
+    String bundles_list = bundles.join(", ").replace(',', '')
+    """
+    for bundle in $bundles_list;
+        do if [[ \$bundle == *"__"* ]]; then
+            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
+            bname=\${bundle:\$pos}
+            bname=\$(basename \$bname .trk)
+        else
+            bname=\$(basename \$bundle .trk)
+        fi
+        bname=\${bname/_colored/}
+        mv \$bundle \$bname.trk
+        label_map=${sid}__\${bname}_labels.npz
+        distance_map=${sid}__\${bname}_labels.npz
 
-//     script:
-//     """
-//     scil_compute_bundle_voxel_label_map.py  $bundle $centroid ${sid}__${bname}__voxel_label_map.nii.gz
-//     """
-// }
+        scil_compute_bundle_mean_std_per_point.py \$bname.trk \$label_map \$distance_map \
+            $metrics --sort_keys $density_weighting > \$bname.json
+        done
+        scil_merge_json.py *.json ${sid}__mean_std_per_point.json --no_list --add_parent_key ${sid}
+    """
+}
 
-// process Bundle_Volume_Per_Label {
-//     input:
-//     set sid, bname, file(voxel_label_map) from voxel_label_map_for_volume
+process Plot_Mean_Std_Per_Point {
+    input:
+    set sid, file(mean_std_per_point) from mean_std_per_point_for_plot
 
-//     output:
-//     set sid, val(bname), "${sid}__${bname}__volume_per_label.json" into\
-//             volume_per_label_to_aggregate
+    output:
+    set sid, "*.png"
 
-//     script:
-//     """
-//     scil_image_math.py convert $voxel_label_map $voxel_label_map --data_type int16 -f 
-//     scil_compute_bundle_volume_per_label.py\
-//         --sort_keys\
-//         $voxel_label_map $bname >\
-//         ${sid}__${bname}__volume_per_label_raw.json
-//     jq 'to_entries|map({(.key|ltrimstr("${sid}__")|\
-//                          rtrimstr("__outliers_removed_colored")):.value})|\
-//         reduce .[] as \$item ({}; . + \$item)|\
-//         {"${sid}": .}' ${sid}__${bname}__volume_per_label_raw.json >\
-//             ${sid}__${bname}__volume_per_label.json
-//     """
-// }
-
-// bundle_for_mean_std_per_point
-//     .phase(label_distance_maps_for_mean_std_per_point)
-//         {it -> it[0] + it[1]}
-//     .map{ch1, ch2 -> [*ch1, *ch2[2..3]]}
-//     .set{bundle_and_label_distance_maps_for_mean_std_per_point}
-
-// metrics_for_mean_std_per_point
-//     .cross(bundle_and_label_distance_maps_for_mean_std_per_point)
-//     .map{ch1, ch2 -> [*ch2, *ch1[1..-1]]}
-//     .set{in_bundle_mean_std_per_point}
-
-// process Bundle_Mean_Std_Per_Point {
-//     input:
-//     set sid, bname, file(bundle), file(label_map), file(distance_map),
-//         file(metrics) from in_bundle_mean_std_per_point
-
-//     output:
-//     set sid, val(bname), "${sid}__${bname}__mean_std_per_point_raw.json" into\
-//         mean_std_per_point_for_plot
-//     set sid, val(bname), "${sid}__${bname}__mean_std_per_point.json" into\
-//         mean_std_per_point_to_aggregate
-
-//     script:
-//     density_weighting =\
-//         params.mean_std_per_point_density_weighting ? '--density_weighting' : ''
-//     """
-//     scil_compute_bundle_mean_std_per_point.py --sort_keys $density_weighting $bundle\
-//         $label_map $distance_map $metrics |\
-//         jq 'to_entries|map({(.key|rtrimstr("__outliers_removed_colored")):.value})|
-//                            reduce .[] as \$item ({}; . + \$item)'\
-//         > ${sid}__${bname}__mean_std_per_point_raw.json
-//     jq 'to_entries|map({(.key|ltrimstr("${sid}__")):.value})|\
-//         reduce .[] as \$item ({}; . + \$item)|\
-//         {"${sid}": .}' ${sid}__${bname}__mean_std_per_point_raw.json >\
-//             ${sid}__${bname}__mean_std_per_point.json
-//     """
-// }
-
-// mean_std_per_point_for_plot
-//     .combine(color_for_mean_std_plot, by: [0, 1])
-//     .set{mean_std_per_point_and_color_for_plot}
-
-// process Bundle_Plot_Mean_Std_Per_Point {
-//     input:
-//     set sid, val(bname), file(mean_std_per_point),
-//         val(color) from mean_std_per_point_and_color_for_plot
-
-//     output:
-//     set sid, val(bname), "*.png"
-
-//     script:
-//     """
-//     scil_plot_mean_std_per_point.py $mean_std_per_point tmp_dir/ --fill_color $color
-//     mv tmp_dir/* ./
-//     """
-// }
+    script:
+    def json_str = JsonOutput.toJson(params.colors)
+    """
+    echo '$json_str' >> colors.json
+    scil_plot_mean_std_per_point.py $mean_std_per_point tmp_dir/ --dict_colors colors.json
+    mv tmp_dir/* ./
+    """
+}
 
 // bundle_length_stats_to_aggregate
 //     .groupTuple()
@@ -617,29 +674,6 @@ process Bundle_Endpoints_Map {
 //     """
 // }
 
-// mean_std_per_point_to_aggregate
-//     .groupTuple()
-//     .map{ch1, ch2, ch3 -> [ch1, ch3]}
-//     .set{sorted_mean_std_per_point_to_aggregate}
-
-// process Aggregate_Subject_Mean_Std_Per_Point {
-//     tag = { "${sid}" }
-
-//     input:
-//     set sid, file(jsons) from sorted_mean_std_per_point_to_aggregate
-
-//     output:
-//     file "${sid}__mean_std_per_point_agg.json" into\
-//         all_mean_std_per_point_to_aggregate
-
-//     script:
-//     """
-//     cat *mean_std_per_point.json | jq -s '[.[] | to_entries] | flatten |\
-//         reduce .[] as \$dot ({}; .[\$dot.key] += \$dot.value)' >\
-//             ${sid}__mean_std_per_point_agg.json
-//     """
-// }
-
 // all_endpoints_map_to_aggregate
 //     .collect()
 //     .set{in_aggregate_all_endpoints_map}
@@ -775,114 +809,40 @@ process Bundle_Endpoints_Map {
 //     """
 // }
 
-// all_mean_std_per_point_to_aggregate
-//     .collect()
-//     .set{in_aggregate_all_mean_std_per_point}
+mean_std_per_point_to_aggregate
+    .collect()
+    .set{all_mean_std_per_point_to_aggregate}
 
-// process Aggregate_All_Mean_Std_Per_Point {
-//     tag = { "Statistics" }
-//     publishDir = params.statsPublishDir
+process Aggregate_All_Mean_Std_Per_Point {
+    tag = { "Statistics" }
+    publishDir = params.statsPublishDir
 
-//     input:
-//     file jsons from in_aggregate_all_mean_std_per_point
+    input:
+    file jsons from all_mean_std_per_point_to_aggregate
 
-//     output:
-//     file "mean_std_per_point.json" into in_population_mean_std_per_point
+    output:
+    file "mean_std_per_point.json" into population_mean_std_per_point
 
-//     """
-//     cat *.json | jq -s add > mean_std_per_point.json
-//     """
-// }
+    """
+    scil_merge_json.py $jsons "mean_std_per_point.json" --remove_parent_key --recursive
+    """
+}
 
-// process Population_Mean_Std_Per_Point {
-//     tag = { "Statistics" }
-//     publishDir = params.statsPublishDir
+process Plot_Population_Mean_Std_Per_Point {
+    tag = { "Plots" }
+    publishDir = params.plotPublishDir
 
-//     input:
-//     file json from in_population_mean_std_per_point
+    input:
+    file(json) from population_mean_std_per_point
 
-//     output:
-//     file "population_mean_std_per_point.json" into population_mean_std_per_point
+    output:
+    file "*.png"
 
-//     script:
-//     """
-//     jq -S 'def merge(b): (objects | reduce (b|to_entries[]) as \$e\
-//             (.; .[\$e.key] |= merge(\$e.value))) // .+b;\
-//         .[][][][][]|=[.] | reduce .[] as \$v ({}; merge(\$v)) |\
-//         .[][][][] |= add/length' $json > population_mean_std_per_point.json
-//     """
-// }
-
-// color_for_population_mean_std_plot
-//     .unique()
-//     .collate(2)
-//     .collect()
-//     .set{unique_color_for_population_mean_std_plot}
-
-// population_mean_std_per_point
-//     .combine(unique_color_for_population_mean_std_plot)
-//     .map{ch1 -> [ch1[0], ch1[1..-1]]}
-//     .set{population_mean_std_per_point_and_colors}
-
-// process Plot_Population_Mean_Std_Per_Point {
-//     tag = { "Plots" }
-//     publishDir = params.plotPublishDir + "/Mean_Std_Per_Point"
-
-//     input:
-//     set file(json), val(colors) from population_mean_std_per_point_and_colors
-
-//     output:
-//     file "*.png"
-
-//     script:
-//     def colormap = colors.collectEntries()
-//     bash_map = "( "
-//     for (e in colormap) {
-//         bash_map += "[" + "\"" + e.key + "\"]=\"" + e.value + "\" "
-//     }
-//     bash_map += ")"
-//     """
-//     declare -A lut=${bash_map}
-//     mkdir out_dir/
-//     for i in \$(jq -r 'keys[]' $json);
-//     do
-//         jq -r --arg k \$i '[{key: \$k, value: .[\$k]}] |\
-//             from_entries' $json > tmp_\${i}.json
-//         scil_plot_mean_std_per_point.py tmp_\${i}.json tmp_dir/ --fill_color \${lut[\$i]} -f
-//         mv tmp_dir/* ./
-//     done
-//     """
-// }
-
-// // ***************************
-// // **** UTILITY FUNCTIONS ****
-// // ***************************
-
-// def rgbToString(r, g, b) {
-//     String rs = String.format("%2s",
-//         Integer.toHexString((int)(r * 256))).replace(' ', '0');
-//     String gs = String.format("%2s",
-//         Integer.toHexString((int)(g * 256))).replace(' ', '0');
-//     String bs = String.format("%2s",
-//         Integer.toHexString((int)(b * 256))).replace(' ', '0');
-//     return "0x" + rs + gs + bs;
-// }
-
-// def hsv_to_rgb(hue, saturation, value) {
-//     h = (int)(hue * 6)
-//     float f = hue * 6 - h
-//     float p = value * (1 - saturation)
-//     float q = value * (1 - f * saturation)
-//     float t = value * (1 - (1 - f) * saturation)
-
-//     switch (h) {
-//       case 0: return rgbToString(value, t, p)
-//       case 1: return rgbToString(q, value, p)
-//       case 2: return rgbToString(p, value, t)
-//       case 3: return rgbToString(p, q, value)
-//       case 4: return rgbToString(t, p, value)
-//       case 5: return rgbToString(value, p, q)
-//       default: throw new RuntimeException(
-//         "Something went wrong when converting from HSV to RGB")
-//     }
-// }
+    script:
+    def json_str = JsonOutput.toJson(params.colors)
+    """
+    echo '$json_str' >> colors.json
+    scil_plot_mean_std_per_point.py $json tmp_dir/ --dict_colors colors.json --stats_over_population
+    mv tmp_dir/* ./
+    """
+}

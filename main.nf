@@ -161,7 +161,7 @@ process Bundle_Length_Stats {
     set sid, file(bundles) from bundles_for_length_stats
 
     output:
-    set sid, "${sid}__length_stats.json" into bundle_length_stats_to_aggregate
+    file "${sid}__length_stats.json" into bundle_length_stats_to_aggregate
 
     script:
     String bundles_list = bundles.join(", ").replace(',', '')
@@ -187,7 +187,7 @@ process Bundle_Endpoints_Map {
     set sid, file(bundles) from bundles_for_endpoints_map
 
     output:
-    set sid, "${sid}__endpoints_map_raw.json" into endpoints_map_to_aggregate
+    file "${sid}__endpoints_map_raw.json" into endpoints_map_to_aggregate
     set sid, "*_endpoints_map_head.nii.gz", "*_endpoints_map_tail.nii.gz" \
         into endpoints_map_for_roi_stats
 
@@ -222,8 +222,7 @@ process Bundle_Metrics_Stats_In_Endpoints {
          from metrics_endpoints_for_roi_stats
 
     output:
-    set sid, "${sid}__endpoints_metric_stats.json" into\
-        endpoints_metric_stats_to_aggregate
+    file "${sid}__endpoints_metric_stats.json" into endpoints_metric_stats_to_aggregate
 
     script:
     normalize_weights =\
@@ -295,7 +294,7 @@ process Bundle_Mean_Std {
     set sid, file(metrics), file(bundles) from metrics_bundles_for_mean_std
 
     output:
-    set sid, "${sid}__mean_std.json" into mean_std_to_aggregate
+    file "${sid}__mean_std.json" into mean_std_to_aggregate
 
     script:
     density_weighting =\
@@ -356,7 +355,7 @@ process Bundle_Volume {
     set sid, file(bundles) from bundles_for_volume
 
     output:
-    set sid, "${sid}__volume.json" into volume_to_aggregate
+    file "${sid}__volume.json" into volume_to_aggregate
 
     script:
     String bundles_list = bundles.join(", ").replace(',', '')
@@ -382,7 +381,7 @@ process Bundle_Streamline_Count {
     set sid, file(bundles) from bundles_for_streamline_count
 
     output:
-    set sid, "${sid}__streamline_count.json" into streamline_count_to_aggregate
+    file "${sid}__streamline_count.json" into streamline_count_to_aggregate
 
     script:
     String bundles_list = bundles.join(", ").replace(',', '')
@@ -413,8 +412,7 @@ process Bundle_Voxel_Label_Map {
         bundles_centroids_voxel_label_map
 
     output:
-    set sid, "${sid}__*_voxel_label_map.nii.gz" into\
-        voxel_label_maps_for_volume
+    set sid, "${sid}__*_voxel_label_map.nii.gz" into voxel_label_maps_for_volume
 
     script:
     String bundles_list = bundles.join(", ").replace(',', '')
@@ -440,7 +438,7 @@ process Bundle_Volume_Per_Label {
     set sid, file(voxel_label_maps) from voxel_label_maps_for_volume
 
     output:
-    set sid, "${sid}__volume_per_label.json" into volume_per_label_to_aggregate
+    file "${sid}__volume_per_label.json" into volume_per_label_to_aggregate
 
     script:
     String maps_list = voxel_label_maps.join(", ").replace(',', '')
@@ -519,295 +517,153 @@ process Plot_Mean_Std_Per_Point {
     """
 }
 
-// bundle_length_stats_to_aggregate
-//     .groupTuple()
-//     .set{sorted_bundle_length_stats_to_aggretate}
-
-// process Aggregate_Subject_Bundle_Length_Stats {
-//     tag = { "${sid}" }
-
-//     input:
-//     set sid, file(jsons) from sorted_bundle_length_stats_to_aggretate
-
-//     output:
-//     file "${sid}__bundle_length_stats.json"\
-//         into all_bundle_length_stats_to_aggretate
-
-//     script:
-//     """
-//     cat *.json | jq -s 'reduce .[] as \$item ({}; . * \$item)' >\
-//         ${sid}__bundle_length_stats.json
-//     """
-// }
-
-// endpoints_map_to_aggregate
-//     .groupTuple()
-//     .map{ch1, ch2, ch3 -> [ch1, ch3]}
-//     .set{sorted_endpoints_map_to_aggregate}
-
-// process Aggregate_Subject_Endpoints_Map {
-//     tag = { "${sid}" }
-
-//     input:
-//     set sid, file(jsons) from sorted_endpoints_map_to_aggregate
-
-//     output:
-//     file "${sid}__endpoints_map_agg.json" into all_endpoints_map_to_aggregate
-
-//     script:
-//     """
-//     cat *endpoints_map.json | jq -s '[.[] | to_entries] | flatten |\
-//         reduce .[] as \$dot ({}; .[\$dot.key] += \$dot.value)' >\
-//             ${sid}__endpoints_map_agg.json
-//     """
-// }
-
-// endpoints_metric_stats_to_aggregate
-//     .groupTuple()
-//     .map{ch1, ch2, ch3 -> [ch1, ch3]}
-//     .set{sorted_endpoints_metric_stats_to_aggregate}
-
-// process Aggregate_Subject_Endpoints_Metric_Stats {
-//     tag = { "${sid}" }
-
-//     input:
-//     set sid, file(jsons) from sorted_endpoints_metric_stats_to_aggregate
-
-//     output:
-//     file "${sid}__endpoints_metric_stats_agg.json" into\
-//         all_endpoints_metric_stats_to_aggregate
-
-//     script:
-//     """
-//     cat *endpoints_metric_stats.json | jq -s '[.[] | to_entries] | flatten |\
-//         reduce .[] as \$dot ({}; .[\$dot.key] += \$dot.value)' >\
-//             ${sid}__endpoints_metric_stats_agg.json
-//     """
-// }
-
-// mean_std_to_aggregate
-//     .groupTuple()
-//     .map{ch1, ch2, ch3 -> [ch1, ch3]}
-//     .set{sorted_mean_std_to_aggregate}
-
-// process Aggregate_Subject_mean_std {
-//     tag = { "${sid}" }
-
-//     input:
-//     set sid, file(jsons) from sorted_mean_std_to_aggregate
-
-//     output:
-//     file "${sid}__mean_std_agg.json" into all_mean_std_to_aggregate
-
-//     script:
-//     """
-//     cat *mean_std.json | jq -s '[.[] | to_entries] | flatten |\
-//         reduce .[] as \$dot ({}; .[\$dot.key] += \$dot.value)' >\
-//             ${sid}__mean_std_agg.json
-//     """
-// }
-
-// volume_to_aggregate
-//     .groupTuple()
-//     .map{ch1, ch2, ch3 -> [ch1, ch3]}
-//     .set{sorted_volume_to_aggregate}
-
-// process Aggregate_Subject_Volume {
-//     tag = { "${sid}" }
-
-//     input:
-//     set sid, file(jsons) from sorted_volume_to_aggregate
-
-//     output:
-//     file "${sid}__volume_agg.json" into all_volume_to_aggregate
-
-//     script:
-//     """
-//     cat *volume.json | jq -s '[.[] | to_entries] | flatten |\
-//         reduce .[] as \$dot ({}; .[\$dot.key] += \$dot.value)' >\
-//             ${sid}__volume_agg.json
-//     """
-// }
-
-// streamline_count_to_aggregate
-//     .groupTuple()
-//     .map{ch1, ch2, ch3 -> [ch1, ch3]}
-//     .set{sorted_streamline_count_to_aggregate}
-
-// process Aggregate_Subject_streamline_count {
-//     tag = { "${sid}" }
-
-//     input:
-//     set sid, file(jsons) from sorted_streamline_count_to_aggregate
-
-//     output:
-//     file "${sid}__streamline_count_agg.json" into all_streamline_count_to_aggregate
-
-//     script:
-//     """
-//     cat *streamline_count.json | jq -s '[.[] | to_entries] | flatten |\
-//         reduce .[] as \$dot ({}; .[\$dot.key] += \$dot.value)' >\
-//             ${sid}__streamline_count_agg.json
-//     """
-// }
-
-// volume_per_label_to_aggregate
-//     .groupTuple()
-//     .map{ch1, ch2, ch3 -> [ch1, ch3]}
-//     .set{sorted_volume_per_label_to_aggregate}
-
-// process Aggregate_Subject_Volume_Per_Label {
-//     tag = { "${sid}" }
-
-//     input:
-//     set sid, file(jsons) from sorted_volume_per_label_to_aggregate
-
-//     output:
-//     file "${sid}__volume_per_label_agg.json" into\
-//         all_volume_per_label_to_aggregate
-
-//     script:
-//     """
-//     cat *volume_per_label.json | jq -s '[.[] | to_entries] | flatten |\
-//         reduce .[] as \$dot ({}; .[\$dot.key] += \$dot.value)' >\
-//             ${sid}__volume_per_label_agg.json
-//     """
-// }
-
-// all_endpoints_map_to_aggregate
-//     .collect()
-//     .set{in_aggregate_all_endpoints_map}
-
-// process Aggregate_All_Endpoints_Map {
-//     tag = { "Statistics" }
-//     publishDir = params.statsPublishDir
-
-//     input:
-//     file jsons from in_aggregate_all_endpoints_map
-
-//     output:
-//     file "endpoints_map.json"
-
-//     """
-//     cat *.json | jq -s add > endpoints_map.json
-//     """
-// }
-
-// all_endpoints_metric_stats_to_aggregate
-//     .collect()
-//     .set{in_aggregate_all_endpoints_metric_stats}
-
-// process Aggregate_All_Endpoints_Metric_Stats {
-//     tag = { "Statistics" }
-//     publishDir = params.statsPublishDir
-
-//     input:
-//     file jsons from in_aggregate_all_endpoints_metric_stats
-
-//     output:
-//     file "endpoints_metric_stats.json"
-
-//     script:
-//     """
-//     cat *.json | jq -s add > endpoints_metric_stats.json
-//     """
-// }
-
-// all_bundle_length_stats_to_aggretate
-//     .collect()
-//     .set{in_aggregate_all_bundle_length_stats}
-
-// process Aggregate_All_Bundle_Length_Stats {
-//     tag = { "Statistics" }
-//     publishDir = params.statsPublishDir
-
-//     input:
-//     file jsons from in_aggregate_all_bundle_length_stats
-
-//     output:
-//     file "length_stats.json"
-
-//     script:
-//     """
-//     cat *.json | jq -s add > length_stats.json
-//     """
-// }
-
-// all_mean_std_to_aggregate
-//     .collect()
-//     .set{in_aggregate_all_mean_std}
-
-// process Aggregate_All_mean_std {
-//     tag = { "Statistics" }
-//     publishDir = params.statsPublishDir
-
-//     input:
-//     file jsons from in_aggregate_all_mean_std
-
-//     output:
-//     file "mean_std.json"
-
-//     """
-//     cat *.json | jq -s add > mean_std.json
-//     """
-// }
-
-// all_volume_to_aggregate
-//     .collect()
-//     .set{in_aggregate_all_volume}
-
-// process Aggregate_All_Volume {
-//     tag = { "Statistics" }
-//     publishDir = params.statsPublishDir
-
-//     input:
-//     file jsons from in_aggregate_all_volume
-
-//     output:
-//     file "volumes.json"
-
-//     """
-//     cat *.json | jq -s add > volumes.json
-//     """
-// }
-
-// all_streamline_count_to_aggregate
-//     .collect()
-//     .set{in_aggregate_all_streamline_count}
-
-// process Aggregate_All_streamline_count {
-//     tag = { "Statistics" }
-//     publishDir = params.statsPublishDir
-
-//     input:
-//     file jsons from in_aggregate_all_streamline_count
-
-//     output:
-//     file "streamline_count.json"
-
-//     """
-//     cat *.json | jq -s add > streamline_count.json
-//     """
-// }
-
-// all_volume_per_label_to_aggregate
-//     .collect()
-//     .set{in_aggregate_all_volume_per_label}
-
-// process Aggregate_All_Volume_Per_Label {
-//     tag = { "Statistics" }
-//     publishDir = params.statsPublishDir
-
-//     input:
-//     file jsons from in_aggregate_all_volume_per_label
-
-//     output:
-//     file "volume_per_label.json"
-
-//     """
-//     cat *.json | jq -s add > volume_per_label.json
-//     """
-// }
+endpoints_map_to_aggregate
+    .collect()
+    .set{all_aggregate_endspoints_map}
+
+process Aggregate_All_Endpoints_Map {
+    tag = { "Statistics" }
+    publishDir = params.statsPublishDir
+
+    input:
+    file jsons from all_aggregate_endspoints_map
+
+    output:
+    file "endpoints_map.json"
+    file "endpoints_map.xlsx"
+
+    """
+    scil_merge_json.py $jsons endpoints_map.json --no_list
+    scil_convert_json_to_xlsx.py endpoints_map.json endpoints_map.xlsx
+    """
+}
+
+endpoints_metric_stats_to_aggregate
+    .collect()
+    .set{all_aggregate_all_endpoints_metric_stats}
+process Aggregate_All_Endpoints_Metric_Stats {
+    tag = { "Statistics" }
+    publishDir = params.statsPublishDir
+
+    input:
+    file jsons from all_aggregate_all_endpoints_metric_stats
+
+    output:
+    file "endpoints_metric_stats.json"
+    file "endpoints_metric_stats.xlsx"
+
+    script:
+    """
+    scil_merge_json.py $jsons endpoints_metric_stats.json --no_list
+    scil_convert_json_to_xlsx.py endpoints_metric_stats.json endpoints_metric_stats.xlsx
+    """
+}
+
+bundle_length_stats_to_aggregate
+    .collect()
+    .set{all_bundle_length_stats_to_aggretate}
+
+process Aggregate_All_Bundle_Length_Stats {
+    tag = { "Statistics" }
+    publishDir = params.statsPublishDir
+
+    input:
+    file jsons from all_bundle_length_stats_to_aggretate
+
+    output:
+    file "length_stats.json"
+    file "length_stats.xlsx"
+
+    script:
+    """
+    scil_merge_json.py $jsons length_stats.json --no_list
+    scil_convert_json_to_xlsx.py length_stats.json length_stats.xlsx
+    """
+}
+
+mean_std_to_aggregate
+    .collect()
+    .set{all_mean_std_to_aggregate}
+
+process Aggregate_All_mean_std {
+    tag = { "Statistics" }
+    publishDir = params.statsPublishDir
+
+    input:
+    file jsons from all_mean_std_to_aggregate
+
+    output:
+    file "mean_std.json"
+    file "mean_std.xlsx"
+
+    """
+    scil_merge_json.py $jsons mean_std.json --no_list
+    scil_convert_json_to_xlsx.py mean_std.json mean_std.xlsx
+    """
+}
+
+volume_to_aggregate
+    .collect()
+    .set{all_volume_to_aggregate}
+
+process Aggregate_All_Volume {
+    tag = { "Statistics" }
+    publishDir = params.statsPublishDir
+
+    input:
+    file jsons from all_volume_to_aggregate
+
+    output:
+    file "volumes.json"
+    file "volumes.xlsx"
+
+    """
+    scil_merge_json.py $jsons volumes.json --no_list
+    scil_convert_json_to_xlsx.py volumes.json volumes.xlsx
+    """
+}
+
+streamline_count_to_aggregate
+    .collect()
+    .set{all_streamline_count_to_aggregate}
+
+process Aggregate_All_streamline_count {
+    tag = { "Statistics" }
+    publishDir = params.statsPublishDir
+
+    input:
+    file jsons from all_streamline_count_to_aggregate
+
+    output:
+    file "streamline_count.json"
+    file "streamline_count.xlsx"
+
+    """
+    scil_merge_json.py $jsons streamline_count.json --no_list
+    scil_convert_json_to_xlsx.py streamline_count.json streamline_count.xlsx
+    """
+}
+
+volume_per_label_to_aggregate
+    .collect()
+    .set{all_volume_per_label_to_aggregate}
+
+process Aggregate_All_Volume_Per_Label {
+    tag = { "Statistics" }
+    publishDir = params.statsPublishDir
+
+    input:
+    file jsons from all_volume_per_label_to_aggregate
+
+    output:
+    file "volume_per_label.json"
+    file "volume_per_label.xlsx"
+
+    """
+    scil_merge_json.py $jsons volume_per_label.json --no_list
+    scil_convert_json_to_xlsx.py volume_per_label.json volume_per_label.xlsx
+    """
+}
 
 mean_std_per_point_to_aggregate
     .collect()
@@ -822,9 +678,13 @@ process Aggregate_All_Mean_Std_Per_Point {
 
     output:
     file "mean_std_per_point.json" into population_mean_std_per_point
+    file "mean_std_per_point.xlsx"
 
     """
-    scil_merge_json.py $jsons "mean_std_per_point.json" --remove_parent_key --recursive
+    scil_merge_json.py $jsons "mean_std_per_point.json" --remove_parent_key \
+        --recursive
+    scil_convert_json_to_xlsx.py mean_std_per_point.json mean_std_per_point.xlsx \
+        --stats_over_population
     """
 }
 

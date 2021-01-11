@@ -84,7 +84,7 @@ process Bundle_Centroid {
     set sid, file(bundles) from bundles_for_centroids
 
     output:
-    set sid, "*_centroid_${$params.nb_points}.trk" into centroids_computed
+    set sid, "*_centroid_${params.nb_points}.trk" into centroids_computed
 
     when:
     !params.use_provided_centroids
@@ -176,7 +176,9 @@ process Uniformize_Bundle {
 
     # Remove suffix from RecobundlesX if present
     for bundle in *_uniformized.trk; do
-        mv \$bundle \${bundle/$params.bundle_suffix_to_remove/}
+        if [[ \$bundle != \${bundle/$params.bundle_suffix_to_remove/} ]]; then
+            mv \$bundle \${bundle/$params.bundle_suffix_to_remove/}
+        fi
     done
     """
 }

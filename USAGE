@@ -62,9 +62,6 @@ OPTIONAL ARGUMENTS (current value)
 --nb_points                                 Split the fiber bundle in --nb_point sections ($nb_points)
 --use_provided_centroids                    Use the provided pre-computed centroids rather than using automatic computation ($use_provided_centroids)
 
---skip_pruning                              Skip bundle pruning ($skip_pruning)
---skip_outlier_rejection                    Skip bundle outlier rejection ($skip_outlier_rejection)
-
 --mean_std_density_weighting                Weight the mean/std by the local tract density ($mean_std_density_weighting)
 --mean_std_per_point_density_weighting        Weight the mean/std per point by the local tract density ($mean_std_per_point_density_weighting)
 --endpoints_metric_stats_normalize_weights  Normalize the weights to the [0, 1] range ($endpoints_metric_stats_normalize_weights)

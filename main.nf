@@ -16,9 +16,7 @@ if(params.help) {
                 "mean_std_per_point_density_weighting":"$params.mean_std_per_point_density_weighting",
                 "endpoints_metric_stats_normalize_weights":"$params.endpoints_metric_stats_normalize_weights",
                 "voxel_label_map_upsample":"$params.voxel_label_map_upsample",
-                "cpu_count":"$cpu_count",
-                "skip_pruning":"$params.skip_pruning",
-                "skip_outlier_rejection":"$params.skip_outlier_rejection"
+                "cpu_count":"$cpu_count"
         ]
 
     engine = new groovy.text.SimpleTemplateEngine()
@@ -195,7 +193,7 @@ process Color_Bundle {
     String bundles_list = bundles.join(", ").replace(',', '')
     """
     echo '$json_str' >> colors.json
-    scil_assign_color_to_trk.py $bundles_list --dict_colors colors.json
+    scil_assign_color_to_tractogram.py $bundles_list --dict_colors colors.json
     """
 }
 

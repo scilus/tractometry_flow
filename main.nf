@@ -45,7 +45,7 @@ workflow.onComplete {
 Channel
     .fromFilePairs("$params.input/**/bundles/*.trk",
                    size: -1) { it.parent.parent.name }
-    .into{bundles_for_uniformize;bundles_for_centroids}
+    .into{bundles_for_label_and_distance_map;bundles_for_centroids}
 
 Channel
     .fromFilePairs("$params.input/**/metrics/*.nii.gz",
@@ -138,11 +138,51 @@ process Resample_Centroid {
 
 if (params.use_provided_centroids) {
     centroids_provided
-        .into{centroids_for_label_and_distance_map;centroids_for_volume_per_label}
+        .set{centroids_for_label_and_distance_map}
 }
 else {
     centroids_computed
-        .into{centroids_for_label_and_distance_map;centroids_for_volume_per_label}
+        .set{centroids_for_label_and_distance_map}
+}
+
+bundles_for_label_and_distance_map
+    .join(centroids_for_label_and_distance_map, by: 0)
+    .set{bundles_centroids_for_label_and_distance_map}
+
+process Bundle_Label_And_Distance_Maps {
+    input:
+    set sid, file(bundles), file(centroids) from\
+        bundles_centroids_for_label_and_distance_map
+
+    output:
+    set sid, "${sid}__*_labels.npz", "${sid}__*_distances.npz" into\
+        label_distance_maps_for_mean_std_per_point
+    set sid, "${sid}__*_labels.trk" into bundles_for_uniformize
+    file "${sid}__*_distances.trk"
+    set sid, "${sid}__*_labels.nii.gz" into voxel_label_maps_for_volume
+
+    script:
+    String bundles_list = bundles.join(", ").replace(',', '')
+    """
+    for bundle in $bundles_list;
+        do if [[ \$bundle == *"__"* ]]; then
+            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
+            bname=\${bundle:\$pos}
+            bname=\$(basename \$bname .trk)
+        else
+            bname=\$(basename \$bundle .trk)
+        fi
+
+        bname=\${bname/$params.bundle_suffix_to_remove/}
+        centroid=${sid}__\${bname}_centroid_${params.nb_points}.trk
+        scil_compute_bundle_voxel_label_map.py \$bundle \${centroid} \
+            ${sid}__\${bname}_labels.nii.gz \
+            --out_labels_npz ${sid}__\${bname}_labels.npz \
+            --out_distances_npz ${sid}__\${bname}_distances.npz \
+            --labels_color_dpp ${sid}__\${bname}_labels.trk \
+            --distances_color_dpp ${sid}__\${bname}_distances.trk
+        done
+    """
 }
 
 process Uniformize_Bundle {
@@ -150,11 +190,10 @@ process Uniformize_Bundle {
     set sid, file(bundles) from bundles_for_uniformize
 
     output:
-    set sid, "*_uniformized.trk" into bundles_for_coloring
-    set sid, "*_uniformized.trk" into bundles_for_mean_std, bundles_for_endpoints_map,
+    set sid, "*_uniformized.trk" into bundles_for_coloring,
+             bundles_for_mean_std, bundles_for_endpoints_map,
              bundles_for_endpoints_metrics, bundles_for_centroid,
-             bundles_for_label_and_distance_map, bundles_for_volume,
-             bundles_for_streamline_count, bundles_for_volume_per_label,
+             bundles_for_volume, bundles_for_streamline_count,
              bundles_for_mean_std_per_point, bundles_for_length_stats
 
     script:
@@ -165,17 +204,10 @@ process Uniformize_Bundle {
         # filename convention
         if [[ \$bundle == *"__"* ]]; then
             scil_uniformize_streamlines_endpoints.py \$bundle \
-                \${bundle/.trk/_uniformized.trk} --auto -f
+                \${bundle/_labels.trk/_uniformized.trk} --auto -f
         else
             scil_uniformize_streamlines_endpoints.py \$bundle \
-                ${sid}__\${bundle/.trk/_uniformized.trk} --auto -f
-        fi
-    done
-
-    # Remove suffix from RecobundlesX if present
-    for bundle in *_uniformized.trk; do
-        if [[ \$bundle != \${bundle/$params.bundle_suffix_to_remove/} ]]; then
-            mv \$bundle \${bundle/$params.bundle_suffix_to_remove/}
+                ${sid}__\${bundle/_labels.trk/_uniformized.trk} --auto -f
         fi
     done
     """
@@ -365,38 +397,6 @@ process Bundle_Mean_Std {
     """
 }
 
-bundles_for_label_and_distance_map
-    .join(centroids_for_label_and_distance_map, by: 0)
-    .set{bundles_centroids_for_label_and_distance_map}
-
-process Bundle_Label_And_Distance_Maps {
-    input:
-    set sid, file(bundles), file(centroids) from\
-        bundles_centroids_for_label_and_distance_map
-
-    output:
-    set sid, "${sid}__*_labels.npz", "${sid}__*_distances.npz" into\
-        label_distance_maps_for_mean_std_per_point
-
-    script:
-    String bundles_list = bundles.join(", ").replace(',', '')
-    """
-    for bundle in $bundles_list;
-        do if [[ \$bundle == *"__"* ]]; then
-            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
-            bname=\${bundle:\$pos}
-            bname=\$(basename \$bname .trk)
-        else
-            bname=\$(basename \$bundle .trk)
-        fi
-        bname=\${bname/_uniformized/}
-        centroid=\${bundle/_uniformized/_centroid_${params.nb_points}}
-        scil_label_and_distance_maps.py \$bundle \$centroid\
-            ${sid}__\${bname}_labels.npz ${sid}__\${bname}_distances.npz
-        done
-    """
-}
-
 process Bundle_Volume {
     input:
     set sid, file(bundles) from bundles_for_volume
@@ -450,36 +450,6 @@ process Bundle_Streamline_Count {
     """
 }
 
-bundles_for_volume_per_label
-    .join(centroids_for_volume_per_label)
-    .set{bundles_centroids_voxel_label_map}
-
-process Bundle_Voxel_Label_Map {
-    input:
-    set sid, file(bundles), file(centroid) from\
-        bundles_centroids_voxel_label_map
-
-    output:
-    set sid, "${sid}__*_voxel_label_map.nii.gz" into voxel_label_maps_for_volume
-
-    script:
-    String bundles_list = bundles.join(", ").replace(',', '')
-    """
-    for bundle in $bundles_list;
-        do if [[ \$bundle == *"__"* ]]; then
-            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
-            bname=\${bundle:\$pos}
-            bname=\$(basename \$bname .trk)
-        else
-            bname=\$(basename \$bundle .trk)
-        fi
-        bname=\${bname/_uniformized/}
-        centroid=\${bundle/_uniformized/_centroid_${params.nb_points}}
-        scil_compute_bundle_voxel_label_map.py  \$bundle \$centroid \
-            ${sid}__\${bname}_voxel_label_map.nii.gz
-    done
-    """
-}
 
 process Bundle_Volume_Per_Label {
     input:
@@ -541,7 +511,7 @@ process Bundle_Mean_Std_Per_Point {
         bname=\${bname/_uniformized/}
         mv \$bundle \$bname.trk
         label_map=${sid}__\${bname}_labels.npz
-        distance_map=${sid}__\${bname}_labels.npz
+        distance_map=${sid}__\${bname}_distances.npz
 
         scil_compute_bundle_mean_std_per_point.py \$bname.trk \$label_map \$distance_map \
             $metrics --sort_keys $density_weighting > \$bname.json

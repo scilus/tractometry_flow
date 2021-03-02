@@ -13,6 +13,7 @@ DESCRIPTION
 
                             [root]
                             ├── S1
+                            │   ├── *lesion_mask.nii.gz (optional)
                             │   ├── metrics
                             │   │   └── *.nii.gz
                             │   └── bundles

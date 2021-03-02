@@ -57,7 +57,7 @@ Channel
     .into{centroids_for_resample; in_centroids_check}
 
 Channel
-    .fromFilePairs("$params.input/**/lesion_mask.nii.gz",
+    .fromFilePairs("$params.input/**/*lesion_mask.nii.gz",
         size: -1) { it.parent.name }
     .set{lesion_for_lesion_load}
 

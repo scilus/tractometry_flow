@@ -15,7 +15,6 @@ if(params.help) {
                 "mean_std_density_weighting":"$params.mean_std_density_weighting",
                 "mean_std_per_point_density_weighting":"$params.mean_std_per_point_density_weighting",
                 "endpoints_metric_stats_normalize_weights":"$params.endpoints_metric_stats_normalize_weights",
-                "voxel_label_map_upsample":"$params.voxel_label_map_upsample",
                 "cpu_count":"$cpu_count"
         ]
 
@@ -56,6 +55,11 @@ Channel
     .fromFilePairs("$params.input/**/centroids/*.trk",
         size: -1) { it.parent.parent.name }
     .into{centroids_for_resample; in_centroids_check}
+
+Channel
+    .fromFilePairs("$params.input/**/lesion_mask.nii.gz",
+        size: -1) { it.parent.name }
+    .set{lesion_for_lesion_load}
 
 in_metrics
     .set{metrics_for_rename}
@@ -159,7 +163,8 @@ process Bundle_Label_And_Distance_Maps {
         label_distance_maps_for_mean_std_per_point
     set sid, "${sid}__*_labels.trk" into bundles_for_uniformize
     file "${sid}__*_distances.trk"
-    set sid, "${sid}__*_labels.nii.gz" into voxel_label_maps_for_volume
+    set sid, "${sid}__*_labels.nii.gz" into voxel_label_maps_for_volume,
+                                            voxel_label_map_for_lesion_load
 
     script:
     String bundles_list = bundles.join(", ").replace(',', '')
@@ -191,6 +196,7 @@ process Uniformize_Bundle {
 
     output:
     set sid, "*_uniformized.trk" into bundles_for_coloring,
+             bundles_for_lesion_load,
              bundles_for_mean_std, bundles_for_endpoints_map,
              bundles_for_endpoints_metrics, bundles_for_centroid,
              bundles_for_volume, bundles_for_streamline_count,
@@ -210,6 +216,69 @@ process Uniformize_Bundle {
                 ${sid}__\${bundle/_labels.trk/_uniformized.trk} --auto -f
         fi
     done
+    """
+}
+
+lesion_for_lesion_load
+    .join(bundles_for_lesion_load, by: 0)
+    .join(voxel_label_map_for_lesion_load, by: 0)
+    .set{lesion_bundles_voxel_label_maps_for_lesion_load}
+
+process Lesion_Load {
+    input:
+    set sid, file(lesion), file(bundles), file(label_maps) from\
+        lesion_bundles_voxel_label_maps_for_lesion_load
+
+    output:
+    file "${sid}__lesion_load.json" into lesion_load_to_aggregate
+    file "${sid}__lesion_load_per_point.json" into lesion_load_per_point_to_aggregate
+    set sid, "${sid}__lesion_load_per_point.json" into lesion_load_per_point_for_plot
+    file "${sid}__lesion_streamlines_stats.json"
+    file "${sid}__*_lesion_map.nii.gz"
+    file "${sid}__lesion_stats.json"
+
+    script:
+    String bundles_list = bundles.join(", ").replace(',', '')
+    """
+    mkdir streamlines_stats/
+    mkdir lesion_load/
+    mkdir lesion_load_per_point/
+    for bundle in $bundles_list;
+        do if [[ \$bundle == *"__"* ]]; then
+            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
+            bname=\${bundle:\$pos}
+            bname=\$(basename \$bname .trk)
+        else
+            bname=\$(basename \$bundle .trk)
+        fi
+        bname=\${bname/_uniformized/}
+        rm ${sid}__lesion_stats.json -f
+        mv ${sid}__\${bname}_labels.nii.gz \$bname.nii.gz
+        mv \$bundle \$bname.trk
+
+        scil_analyse_lesions_load.py $lesion lesion_load_per_point/\$bname.json \
+            --bundle_labels_map \$bname.nii.gz \
+            --out_lesion_atlas "${sid}__\${bname}_lesion_map.nii.gz"
+
+        scil_analyse_lesions_load.py $lesion lesion_load/\$bname.json \
+            --bundle \$bname.trk --out_lesion_stats ${sid}__lesion_stats.json \
+            --out_streamlines_stats streamlines_stats/\$bname.json
+    done
+
+    scil_merge_json.py ${sid}__lesion_stats.json ${sid}__lesion_stats.json \
+        --remove_parent_key --add_parent_key ${sid} -f
+
+    cd streamlines_stats
+    scil_merge_json.py *.json ../${sid}__lesion_streamlines_stats.json \
+        --add_parent_key ${sid}
+    
+    cd ../lesion_load
+    scil_merge_json.py *.json ../${sid}__lesion_load.json \
+        --add_parent_key ${sid}
+    
+    cd ../lesion_load_per_point
+    scil_merge_json.py *.json ../${sid}__lesion_load_per_point.json \
+        --add_parent_key ${sid}
     """
 }
 
@@ -521,9 +590,13 @@ process Bundle_Mean_Std_Per_Point {
     """
 }
 
+mean_std_per_point_for_plot
+    .join(lesion_load_per_point_for_plot)
+    .set{mean_std_lesion_per_point}
+
 process Plot_Mean_Std_Per_Point {
     input:
-    set sid, file(mean_std_per_point) from mean_std_per_point_for_plot
+    set sid, file(mean_std_per_point), file(lesion_per_point) from mean_std_lesion_per_point
 
     output:
     set sid, "*.png"
@@ -535,6 +608,61 @@ process Plot_Mean_Std_Per_Point {
     scil_plot_mean_std_per_point.py $mean_std_per_point tmp_dir/ --dict_colors \
         colors.json
     mv tmp_dir/* ./
+
+    scil_merge_json.py $lesion_per_point tmp.json --recursive --average
+    scil_plot_mean_std_per_point.py tmp.json tmp_dir/ --dict_colors \
+        colors.json
+    mv tmp_dir/* ./
+    """
+}
+
+lesion_load_to_aggregate
+    .collect()
+    .set{all_lesion_load_to_aggregate}
+
+process Aggregate_All_Lesion_Load {
+    tag = { "Statistics" }
+    publishDir = params.statsPublishDir
+
+    input:
+    file jsons from all_lesion_load_to_aggregate
+
+    output:
+    file "lesion_load.json"
+    file "lesion_load.xlsx"
+
+    script:
+    """
+    scil_merge_json.py $jsons lesion_load.json --average --recursive
+    scil_convert_json_to_xlsx.py lesion_load.json lesion_load.xlsx
+    """
+}
+
+lesion_load_per_point_to_aggregate
+    .collect()
+    .set{all_lesion_load_per_point_to_aggregate}
+
+process Aggregate_All_Lesion_Load_Per_Point {
+    tag = { "Statistics" }
+    publishDir = params.statsPublishDir
+
+    input:
+    file jsons from all_lesion_load_per_point_to_aggregate
+
+    output:
+    file "lesion_load_per_point.json" into population_lesion_load_per_point
+    file "lesion_load_per_point.xlsx"
+
+    script:
+    String json_list = jsons.join(", ").replace(',', '')
+    """
+    for json in $json_list
+        do scil_merge_json.py \$json \${json/.json/_avg.json} --remove_parent_key --recursive --average
+    done
+    scil_merge_json.py *_avg.json lesion_load_per_point.json  \
+        --recursive
+    scil_convert_json_to_xlsx.py lesion_load_per_point.json lesion_load_per_point.xlsx \
+        --stats_over_population
     """
 }
 
@@ -709,12 +837,16 @@ process Aggregate_All_Mean_Std_Per_Point {
     """
 }
 
+population_mean_std_per_point
+    .concat(population_lesion_load_per_point)
+    .set{population_mean_std_lesion_per_point}
+
 process Plot_Population_Mean_Std_Per_Point {
     tag = { "Plots" }
     publishDir = params.plotPublishDir
 
     input:
-    file(json) from population_mean_std_per_point
+    file(json_a) from population_mean_std_lesion_per_point
 
     output:
     file "*.png"
@@ -723,7 +855,7 @@ process Plot_Population_Mean_Std_Per_Point {
     def json_str = JsonOutput.toJson(params.colors)
     """
     echo '$json_str' >> colors.json
-    scil_plot_mean_std_per_point.py $json tmp_dir/ --dict_colors colors.json \
+    scil_plot_mean_std_per_point.py $json_a tmp_dir/ --dict_colors colors.json \
         --stats_over_population
     mv tmp_dir/* ./
     """

@@ -12,6 +12,7 @@ if(params.help) {
     cpu_count = Runtime.runtime.availableProcessors()
     bindings = ["use_provided_centroids":"$params.use_provided_centroids",
                 "nb_points":"$params.nb_points",
+                "min_lesion_vol":"$params.min_lesion_vol",
                 "mean_std_density_weighting":"$params.mean_std_density_weighting",
                 "mean_std_per_point_density_weighting":"$params.mean_std_per_point_density_weighting",
                 "endpoints_metric_stats_normalize_weights":"$params.endpoints_metric_stats_normalize_weights",
@@ -258,11 +259,13 @@ process Lesion_Load {
 
         scil_analyse_lesions_load.py $lesion lesion_load_per_point/\$bname.json \
             --bundle_labels_map \$bname.nii.gz \
-            --out_lesion_atlas "${sid}__\${bname}_lesion_map.nii.gz"
+            --out_lesion_atlas "${sid}__\${bname}_lesion_map.nii.gz" \
+            --min_lesion_vol $params.min_lesion_vol
 
         scil_analyse_lesions_load.py $lesion lesion_load/\$bname.json \
             --bundle \$bname.trk --out_lesion_stats ${sid}__lesion_stats.json \
-            --out_streamlines_stats streamlines_stats/\$bname.json
+            --out_streamlines_stats streamlines_stats/\$bname.json \
+            --min_lesion_vol $params.min_lesion_vol
     done
 
     scil_merge_json.py ${sid}__lesion_stats.json ${sid}__lesion_stats.json \

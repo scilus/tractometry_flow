@@ -96,8 +96,6 @@ process Remove_invalid_streamlines {
           bname=\$(basename \$bundle .trk)
       fi
 
-      echo \$bundle
-      echo ${sid}__\$bname.trk
       scil_remove_invalid_streamlines.py \$bundle ${sid}__\${bname}_clean.trk -f
   done
   """

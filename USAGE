@@ -65,11 +65,12 @@ OPTIONAL ARGUMENTS (current value)
 --mean_std_density_weighting                Weight the mean/std by the local tract density ($mean_std_density_weighting)
 --mean_std_per_point_density_weighting      Weight the mean/std per point by the local tract density ($mean_std_per_point_density_weighting)
 --endpoints_metric_stats_normalize_weights  Normalize the weights to the [0, 1] range ($endpoints_metric_stats_normalize_weights)
+--skip_projection_endpoints_metrics         Skip the (slow) process that projects metrics onto the endpoints of streamlines  ($skip_projection_endpoints_metrics)
 
 --processes                                 The number of parallel processes to launch ($cpu_count).
                                             Only affects the local scheduler.
 --output_dir                                Directory where to write the final results.
-                                            By default, will be in "./results"
+                                            By default, will be in "./results_tractometry"
 
 NOTES
 

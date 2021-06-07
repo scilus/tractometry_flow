@@ -16,6 +16,7 @@ if(params.help) {
                 "mean_std_per_point_density_weighting":"$params.mean_std_per_point_density_weighting",
                 "endpoints_metric_stats_normalize_weights":"$params.endpoints_metric_stats_normalize_weights",
                 "voxel_label_map_upsample":"$params.voxel_label_map_upsample",
+                "skip_projection_endpoints_metrics":"$params.skip_projection_endpoints_metrics",
                 "cpu_count":"$cpu_count"
         ]
 

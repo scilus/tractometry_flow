@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 import com.google.common.hash.Hashing
 import com.google.common.base.Charsets
-import groovy.json.JsonOutput 
+import groovy.json.JsonOutput
 
 params.help = false
 params.input = false
@@ -45,7 +45,7 @@ workflow.onComplete {
 Channel
     .fromFilePairs("$params.input/**/bundles/*.trk",
                    size: -1) { it.parent.parent.name }
-    .into{bundles_for_label_and_distance_map;bundles_for_centroids}
+    .set{bundles_for_rm_invalid}
 
 Channel
     .fromFilePairs("$params.input/**/metrics/*.nii.gz",
@@ -77,6 +77,32 @@ process Rename_Metrics {
     """
 }
 
+process Remove_invalid_streamlines {
+  input:
+    set sid, file(bundles) from bundles_for_rm_invalid
+
+  output:
+    set sid, "${sid}__*.trk" into bundles_for_label_and_distance_map, bundles_for_centroids
+
+  script:
+  String bundles_list = bundles.join(", ").replace(',', '')
+  """
+  for bundle in $bundles_list;
+      do if [[ \$bundle == *"__"* ]]; then
+          pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
+          bname=\${bundle:\$pos}
+          bname=\$(basename \$bname .trk)
+      else
+          bname=\$(basename \$bundle .trk)
+      fi
+
+      echo \$bundle
+      echo ${sid}__\$bname.trk
+      scil_remove_invalid_streamlines.py \$bundle ${sid}__\${bname}_clean.trk -f
+  done
+  """
+}
+
 process Bundle_Centroid {
     input:
     set sid, file(bundles) from bundles_for_centroids
@@ -99,7 +125,7 @@ process Bundle_Centroid {
             bname=\$(basename \$bundle .trk)
         fi
         bname=\${bname/$params.bundle_suffix_to_remove/}
-    
+
         scil_compute_centroid.py \$bundle centroid.trk --nb_points $params.nb_points -f
         scil_uniformize_streamlines_endpoints.py centroid.trk ${sid}__\${bname}_centroid_${params.nb_points}.trk --auto
     done
@@ -359,7 +385,10 @@ process Bundle_Endpoints_Metrics {
 
     scil_compute_endpoints_metric.py \$bundle $metrics \${bname}
     cd \${bname}
-    for i in *.nii.gz; do mv "\$i" "${sid}__\$i"; done
+    for i in *.nii.gz;
+    do
+    mv "\$i" "${sid}__\$i";
+    done
     rename s/${sid}__${sid}__/${sid}__/ *
 
     """
@@ -460,7 +489,7 @@ process Bundle_Volume_Per_Label {
 
     script:
     String maps_list = voxel_label_maps.join(", ").replace(',', '')
-    """ 
+    """
     for map in $maps_list;
         do if [[ \$map == *"__"* ]]; then
             pos=\$((\$(echo \$map | grep -b -o __ | cut -d: -f1)+2))

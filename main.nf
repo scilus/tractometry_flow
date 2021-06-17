@@ -730,8 +730,7 @@ process Aggregate_All_Mean_Std_Per_Point {
     file "mean_std_per_point.xlsx"
 
     """
-    scil_merge_json.py $jsons "mean_std_per_point.json" --remove_parent_key \
-        --recursive
+    scil_merge_json.py $jsons "mean_std_per_point.json" --recursive -f
     scil_convert_json_to_xlsx.py mean_std_per_point.json mean_std_per_point.xlsx \
         --stats_over_population
     """

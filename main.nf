@@ -594,12 +594,10 @@ process Bundle_Mean_Std_Per_Point {
 }
 
 mean_std_per_point_for_plot
-    .join(lesion_load_per_point_for_plot)
-    .set{mean_std_lesion_per_point}
 
 process Plot_Mean_Std_Per_Point {
     input:
-    set sid, file(mean_std_per_point), file(lesion_per_point) from mean_std_lesion_per_point
+    set sid, file(mean_std_per_point) from mean_std_per_point_for_plot
 
     output:
     set sid, "*.png"
@@ -611,14 +609,26 @@ process Plot_Mean_Std_Per_Point {
     scil_plot_mean_std_per_point.py $mean_std_per_point tmp_dir/ --dict_colors \
         colors.json
     mv tmp_dir/* ./
+    """
+}
 
+process Plot_Lesions_Per_Point {
+    input:
+    set sid, file(lesion_per_point) from lesion_load_per_point_for_plot
+
+    output:
+    set sid, "*.png"
+
+    script:
+    def json_str = JsonOutput.toJson(params.colors)
+    """
+    echo '$json_str' >> colors.json
     scil_merge_json.py $lesion_per_point tmp.json --recursive --average
     scil_plot_mean_std_per_point.py tmp.json tmp_dir/ --dict_colors \
         colors.json
     mv tmp_dir/* ./
     """
 }
-
 lesion_load_to_aggregate
     .collect()
     .set{all_lesion_load_to_aggregate}

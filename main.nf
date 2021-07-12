@@ -703,10 +703,10 @@ process Aggregate_All_Lesion_Load_Per_Point {
     String json_list = jsons.join(", ").replace(',', '')
     """
     for json in $json_list
-        do scil_merge_json.py \$json \${json/.json/_avg.json} --remove_parent_key --recursive
+        do scil_merge_json.py \$json \${json/.json/_avg.json} --remove_parent_key --recursive --average_last_layer
     done
     scil_merge_json.py *_avg.json lesion_load_per_point.json  \
-        --recursive --average_last_layer
+        --recursive
     scil_convert_json_to_xlsx.py lesion_load_per_point.json lesion_load_per_point.xlsx \
         --stats_over_population
     """
@@ -737,6 +737,7 @@ process Aggregate_All_Endpoints_Map {
 endpoints_metric_stats_to_aggregate
     .collect()
     .set{all_aggregate_all_endpoints_metric_stats}
+
 process Aggregate_All_Endpoints_Metric_Stats {
     tag = { "Statistics" }
     publishDir = params.statsPublishDir
@@ -825,7 +826,7 @@ streamline_counts_to_aggregate
     .collect()
     .set{all_streamline_counts_to_aggregate}
 
-process Aggregate_All_streamline_count {
+process Aggregate_All_Streamline_Count {
     tag = { "Statistics" }
     publishDir = params.statsPublishDir
 

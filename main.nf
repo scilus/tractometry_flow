@@ -13,10 +13,11 @@ if(params.help) {
     bindings = ["use_provided_centroids":"$params.use_provided_centroids",
                 "nb_points":"$params.nb_points",
                 "min_lesion_vol":"$params.min_lesion_vol",
+                "min_streamline_count":"$params.min_streamline_count",
+                "min_voxel_count":"$params.min_voxel_count",
                 "mean_std_density_weighting":"$params.mean_std_density_weighting",
                 "mean_std_per_point_density_weighting":"$params.mean_std_per_point_density_weighting",
                 "endpoints_metric_stats_normalize_weights":"$params.endpoints_metric_stats_normalize_weights",
-                "voxel_label_map_upsample":"$params.voxel_label_map_upsample",
                 "skip_projection_endpoints_metrics":"$params.skip_projection_endpoints_metrics",
                 "cpu_count":"$cpu_count"
         ]
@@ -84,12 +85,12 @@ process Rename_Metrics {
     """
 }
 
-process Remove_invalid_streamlines {
+process Remove_Invalid_Streamlines {
   input:
     set sid, file(bundles) from bundles_for_rm_invalid
 
   output:
-    set sid, "${sid}__*.trk" into bundles_for_label_and_distance_map, bundles_for_centroids
+    set sid, "${sid}__*_ic.trk" into bundles_for_label_and_distance_map, bundles_for_centroids
 
   script:
   String bundles_list = bundles.join(", ").replace(',', '')
@@ -102,8 +103,9 @@ process Remove_invalid_streamlines {
       else
           bname=\$(basename \$bundle .trk)
       fi
+      bname=\${bname/$params.bundle_suffix_to_remove/}
 
-      scil_remove_invalid_streamlines.py \$bundle ${sid}__\${bname}_clean.trk --cut_invalid -f
+      scil_remove_invalid_streamlines.py \$bundle ${sid}__\${bname}_ic.trk --cut_invalid -f
   done
   """
 }
@@ -129,8 +131,7 @@ process Bundle_Centroid {
         else
             bname=\$(basename \$bundle .trk)
         fi
-        bname=\${bname/$params.bundle_suffix_to_remove/}
-
+        bname=\${bname/_ic/}
         scil_compute_centroid.py \$bundle centroid.trk --nb_points $params.nb_points -f
         scil_uniformize_streamlines_endpoints.py centroid.trk ${sid}__\${bname}_centroid_${params.nb_points}.trk --auto
     done
@@ -159,6 +160,7 @@ process Resample_Centroid {
             bname=\$(basename \$bundle .trk)
         fi
         bname=\${bname/_centroid/}
+        bname=\${bname/_ic/}
 
         scil_resample_streamlines.py \$bundle \
             "${sid}__\${bname}_centroid_${params.nb_points}.trk" \
@@ -204,15 +206,17 @@ process Bundle_Label_And_Distance_Maps {
         else
             bname=\$(basename \$bundle .trk)
         fi
-
-        bname=\${bname/$params.bundle_suffix_to_remove/}
+        bname=\${bname/_ic/}
+ 
         centroid=${sid}__\${bname}_centroid_${params.nb_points}.trk
         scil_compute_bundle_voxel_label_map.py \$bundle \${centroid} \
             ${sid}__\${bname}_labels.nii.gz \
             --out_labels_npz ${sid}__\${bname}_labels.npz \
             --out_distances_npz ${sid}__\${bname}_distances.npz \
             --labels_color_dpp ${sid}__\${bname}_labels.trk \
-            --distances_color_dpp ${sid}__\${bname}_distances.trk
+            --distances_color_dpp ${sid}__\${bname}_distances.trk \
+            --min_streamline_count ${params.min_streamline_count} \
+            --min_voxel_count ${params.min_voxel_count}
         done
     """
 }
@@ -652,7 +656,7 @@ process Plot_Lesions_Per_Point {
     def json_str = JsonOutput.toJson(params.colors)
     """
     echo '$json_str' >> colors.json
-    scil_merge_json.py $lesion_per_point tmp.json --recursive --average
+    scil_merge_json.py $lesion_per_point tmp.json --recursive --average_last_layer
     scil_plot_mean_std_per_point.py tmp.json tmp_dir/ --dict_colors \
         colors.json
     mv tmp_dir/* ./
@@ -675,7 +679,7 @@ process Aggregate_All_Lesion_Load {
 
     script:
     """
-    scil_merge_json.py $jsons lesion_load.json --average --recursive
+    scil_merge_json.py $jsons lesion_load.json --average_last_layer --recursive
     scil_convert_json_to_xlsx.py lesion_load.json lesion_load.xlsx
     """
 }
@@ -699,10 +703,10 @@ process Aggregate_All_Lesion_Load_Per_Point {
     String json_list = jsons.join(", ").replace(',', '')
     """
     for json in $json_list
-        do scil_merge_json.py \$json \${json/.json/_avg.json} --remove_parent_key --recursive --average
+        do scil_merge_json.py \$json \${json/.json/_avg.json} --remove_parent_key --recursive
     done
     scil_merge_json.py *_avg.json lesion_load_per_point.json  \
-        --recursive
+        --recursive --average_last_layer
     scil_convert_json_to_xlsx.py lesion_load_per_point.json lesion_load_per_point.xlsx \
         --stats_over_population
     """
@@ -723,6 +727,7 @@ process Aggregate_All_Endpoints_Map {
     file "endpoints_map.json"
     file "endpoints_map.xlsx"
 
+    script:
     """
     scil_merge_json.py $jsons endpoints_map.json --no_list
     scil_convert_json_to_xlsx.py endpoints_map.json endpoints_map.xlsx
@@ -787,6 +792,7 @@ process Aggregate_All_mean_std {
     file "mean_std.json"
     file "mean_std.xlsx"
 
+    script:
     """
     scil_merge_json.py $jsons mean_std.json --no_list
     scil_convert_json_to_xlsx.py mean_std.json mean_std.xlsx
@@ -808,6 +814,7 @@ process Aggregate_All_Volume {
     file "volumes.json"
     file "volumes.xlsx"
 
+    script:
     """
     scil_merge_json.py $jsons volumes.json --no_list
     scil_convert_json_to_xlsx.py volumes.json volumes.xlsx
@@ -829,6 +836,7 @@ process Aggregate_All_streamline_count {
     file "streamline_count.json"
     file "streamline_count.xlsx"
 
+    script:
     """
     scil_merge_json.py $jsons streamline_count.json --no_list
     scil_convert_json_to_xlsx.py streamline_count.json streamline_count.xlsx
@@ -850,6 +858,7 @@ process Aggregate_All_Volume_Per_Label {
     file "volume_per_label.json"
     file "volume_per_label.xlsx"
 
+    script:
     """
     scil_merge_json.py $jsons volume_per_label.json --no_list
     scil_convert_json_to_xlsx.py volume_per_label.json volume_per_label.xlsx
@@ -871,8 +880,14 @@ process Aggregate_All_Mean_Std_Per_Point {
     file "mean_std_per_point.json" into population_mean_std_per_point
     file "mean_std_per_point.xlsx"
 
+    script:
+    String json_list = jsons.join(", ").replace(',', '')
     """
-    scil_merge_json.py $jsons "mean_std_per_point.json" --recursive -f
+    for json in $json_list
+        do scil_merge_json.py \$json \${json/.json/_avg.json} --remove_parent_key --recursive
+    done
+    scil_merge_json.py *_avg.json mean_std_per_point.json  \
+        --recursive
     scil_convert_json_to_xlsx.py mean_std_per_point.json mean_std_per_point.xlsx \
         --stats_over_population
     """

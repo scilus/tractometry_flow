@@ -13,6 +13,7 @@ DESCRIPTION
 
                             [root]
                             ├── S1
+                            │   ├── *lesion_mask.nii.gz (optional)
                             │   ├── metrics
                             │   │   └── *.nii.gz
                             │   └── bundles
@@ -60,6 +61,7 @@ in Trackvis format (.trk)
 OPTIONAL ARGUMENTS (current value)
 
 --nb_points                                 Split the fiber bundle in --nb_point sections ($nb_points)
+--min_lesion_vol                            To be consider 'a lesion' for the pipeline, a lesion must be at least ($min_lesion_vol) mm3.
 --use_provided_centroids                    Use the provided pre-computed centroids rather than using automatic computation ($use_provided_centroids)
 
 --mean_std_density_weighting                Weight the mean/std by the local tract density ($mean_std_density_weighting)

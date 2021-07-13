@@ -19,7 +19,8 @@ if(params.help) {
                 "mean_std_per_point_density_weighting":"$params.mean_std_per_point_density_weighting",
                 "endpoints_metric_stats_normalize_weights":"$params.endpoints_metric_stats_normalize_weights",
                 "skip_projection_endpoints_metrics":"$params.skip_projection_endpoints_metrics",
-                "cpu_count":"$cpu_count"
+                "cpu_count":"$cpu_count",
+                "bundle_suffix_to_remove":"$params.bundle_suffix_to_remove"
         ]
 
     engine = new groovy.text.SimpleTemplateEngine()

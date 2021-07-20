@@ -1,6 +1,8 @@
 Tractometry pipeline
 ====================
 
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/scilus/tractometry_flow)](https://github.com/scilus/tractometry_flow/releases)
+
 This pipeline allows you to extract tractometry information by combining
 subjects's fiber bundles and diffusion MRI metrics.
 

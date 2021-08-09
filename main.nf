@@ -107,8 +107,7 @@ process Fixel_AFD {
     String bundles_list = bundles.join(", ").replace(',', '')
     """
     for bundle in $bundles_list;
-    do
-        if [[ \$bundle == *"__"* ]]; then
+        do if [[ \$bundle == *"__"* ]]; then
             pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
             bname=\${bundle:\$pos}
             bname=\$(basename \$bname .trk)
@@ -121,16 +120,16 @@ process Fixel_AFD {
 }
 
 process Remove_Invalid_Streamlines {
-  input:
+    input:
     set sid, file(bundles) from bundles_for_rm_invalid
 
-  output:
+    output:
     set sid, "${sid}__*_ic.trk" into bundles_for_label_and_distance_map, bundles_for_centroids
 
-  script:
-  String bundles_list = bundles.join(", ").replace(',', '')
-  """
-  for bundle in $bundles_list;
+    script:
+    String bundles_list = bundles.join(", ").replace(',', '')
+    """
+    for bundle in $bundles_list;
       do if [[ \$bundle == *"__"* ]]; then
           pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
           bname=\${bundle:\$pos}
@@ -141,8 +140,8 @@ process Remove_Invalid_Streamlines {
       bname=\${bname/$params.bundle_suffix_to_remove/}
 
       scil_remove_invalid_streamlines.py \$bundle ${sid}__\${bname}_ic.trk --cut_invalid -f
-  done
-  """
+    done
+    """
 }
 
 process Bundle_Centroid {

@@ -96,7 +96,7 @@ bundles_for_fixel_afd
 
 process Fixel_AFD {
     input:
-    set sid, file(bundle), file(fodf) from bundle_fodf_for_fixel_afd
+    set sid, file(bundles), file(fodf) from bundle_fodf_for_fixel_afd
 
     output:
     set sid, "*_afd_metric.trk" into fixel_afd_for_mean_std,
@@ -104,15 +104,19 @@ process Fixel_AFD {
         fixel_afd_for_volume, fixel_afd_for_mean_std_per_point
 
     script:
+    String bundles_list = bundles.join(", ").replace(',', '')
     """
-    if [[ \$bundle == *"__"* ]]; then
-        pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
-        bname=\${bundle:\$pos}
-        bname=\$(basename \$bname .trk)
-    else
-        bname=\$(basename \$bundle .trk)
-    fi
-    scil_compute_mean_fixel_afd_from_bundles.py $bundle $fodf \${bname}_afd_metric.nii.gz
+    for bundle in $bundles_list;
+    do
+        if [[ \$bundle == *"__"* ]]; then
+            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
+            bname=\${bundle:\$pos}
+            bname=\$(basename \$bname .trk)
+        else
+            bname=\$(basename \$bundle .trk)
+        fi
+        scil_compute_mean_fixel_afd_from_bundles.py $bundle $fodf \${bname}_afd_metric.nii.gz
+    done
     """
 }
 

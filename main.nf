@@ -91,7 +91,7 @@ process Rename_Metrics {
     """
 }
 bundles_for_fixel_afd
-    .join(fodf_for_afd_fixel)
+    .join(fodf_for_fixel_afd)
     .set{bundle_fodf_for_fixel_afd}
 
 process Fixel_AFD {

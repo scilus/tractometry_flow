@@ -100,7 +100,7 @@ process Fixel_AFD {
 
     output:
     set sid, "*_afd_metric.trk" into fixel_afd_for_mean_std,
-        fixel_afd_for_endpoints_fixel_afd, fixel_afd_for_endpoints_roi_stats,
+        fixel_afd_for_endpoints_metrics, fixel_afd_for_endpoints_roi_stats,
         fixel_afd_for_volume, fixel_afd_for_mean_std_per_point
 
     script:

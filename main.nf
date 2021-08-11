@@ -459,11 +459,12 @@ process Bundle_Metrics_Stats_In_Endpoints {
         bname=\${bname/_endpoints_map_head/}
         mv \$map \${bname}_head.nii.gz
         mv \${map/_head/_tail} \${bname}_tail.nii.gz
+        metrics=\$(echo !(*afd*).nii.gz)
 
         scil_compute_metrics_stats_in_ROI.py \${bname}_head.nii.gz $normalize_weights\
-            --metrics \!(*afd*).nii.gz \${bname}_afd_metric.nii.gz > \${bname}_head.json
+            --metrics $\metrics \${bname}_afd_metric.nii.gz > \${bname}_head.json
         scil_compute_metrics_stats_in_ROI.py \${bname}_tail.nii.gz $normalize_weights\
-            --metrics \!(*afd*).nii.gz \${bname}_afd_metric.nii.gz > \${bname}_tail.json
+            --metrics $\metrics \${bname}_afd_metric.nii.gz > \${bname}_tail.json
     done
 
     scil_merge_json.py *_tail.json *_head.json ${sid}__endpoints_metric_stats.json \

@@ -460,6 +460,7 @@ process Bundle_Metrics_Stats_In_Endpoints {
         mv \$map \${bname}_head.nii.gz
         mv \${map/_head/_tail} \${bname}_tail.nii.gz
         metrics=\$(echo !(*afd*).nii.gz)
+        echo \$metrics
 
         scil_compute_metrics_stats_in_ROI.py \${bname}_head.nii.gz $normalize_weights\
             --metrics \$metrics \${bname}_afd_metric.nii.gz > \${bname}_head.json

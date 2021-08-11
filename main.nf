@@ -448,6 +448,7 @@ process Bundle_Metrics_Stats_In_Endpoints {
             '--normalize_weights' : '--bin'
     String map_list = endpoints_map_head.join(", ").replace(',', '')
     """
+    shopt -s extglob
     for map in $map_list;
         do if [[ \$map == *"__"* ]]; then
             pos=\$((\$(echo \$map | grep -b -o __ | cut -d: -f1)+2))
@@ -459,13 +460,11 @@ process Bundle_Metrics_Stats_In_Endpoints {
         bname=\${bname/_endpoints_map_head/}
         mv \$map \${bname}_head.nii.gz
         mv \${map/_head/_tail} \${bname}_tail.nii.gz
-        metrics=\$(echo !\(*afd*\).nii.gz)
-        echo \$metrics
 
         scil_compute_metrics_stats_in_ROI.py \${bname}_head.nii.gz $normalize_weights\
-            --metrics \$metrics \${bname}_afd_metric.nii.gz > \${bname}_head.json
+            --metrics !(*afd*).nii.gz \${bname}_afd_metric.nii.gz > \${bname}_head.json
         scil_compute_metrics_stats_in_ROI.py \${bname}_tail.nii.gz $normalize_weights\
-            --metrics \$metrics \${bname}_afd_metric.nii.gz > \${bname}_tail.json
+            --metrics !(*afd*).nii.gz \${bname}_afd_metric.nii.gz > \${bname}_tail.json
     done
 
     scil_merge_json.py *_tail.json *_head.json ${sid}__endpoints_metric_stats.json \

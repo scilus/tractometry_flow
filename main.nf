@@ -426,7 +426,7 @@ process Bundle_Endpoints_Map {
 }
 metrics_for_endpoints_roi_stats
     .mix(fixel_afd_for_endpoints_roi_stats)
-    .groupTuple()
+    .groupTuple(by: 0)
     .combine(endpoints_maps_for_roi_stats, by: 0)
     .set{metrics_endpoints_for_roi_stats}
 

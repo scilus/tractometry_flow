@@ -99,7 +99,7 @@ process Fixel_AFD {
     set sid, file(bundles), file(fodf) from bundle_fodf_for_fixel_afd
 
     output:
-    set sid, "*_afd_metric.trk" into fixel_afd_for_mean_std,
+    set sid, "*_afd_metric.nii.gz" into fixel_afd_for_mean_std,
         fixel_afd_for_endpoints_metrics, fixel_afd_for_endpoints_roi_stats,
         fixel_afd_for_volume, fixel_afd_for_mean_std_per_point
 
@@ -425,13 +425,13 @@ process Bundle_Endpoints_Map {
     """
 }
 metrics_for_endpoints_roi_stats
+    .join(fixel_afd_for_endpoints_roi_stats)
     .combine(endpoints_maps_for_roi_stats, by: 0)
-    .combine(fixel_afd_for_endpoints_roi_stats, by: 0)
     .set{metrics_endpoints_for_roi_stats}
 
 process Bundle_Metrics_Stats_In_Endpoints {
     input:
-    set sid, file(metrics), file(endpoints_map_head), file(endpoints_map_tail), file(afd) \
+    set sid, file(metrics), file(endpoints_map_head), file(endpoints_map_tail)\
          from metrics_endpoints_for_roi_stats
 
     output:
@@ -456,9 +456,9 @@ process Bundle_Metrics_Stats_In_Endpoints {
         mv \${map/_head/_tail} \${bname}_tail.nii.gz
 
         scil_compute_metrics_stats_in_ROI.py \${bname}_head.nii.gz $normalize_weights\
-            --metrics $metrics \${bname}_afd_metric.nii.gz > \${bname}_head.json
+            --metrics !(*afd*).nii.gz \${bname}_afd_metric.nii.gz > \${bname}_head.json
         scil_compute_metrics_stats_in_ROI.py \${bname}_tail.nii.gz $normalize_weights\
-            --metrics $metrics \${bname}_afd_metric.nii.gz > \${bname}_tail.json
+            --metrics !(*afd*).nii.gz \${bname}_afd_metric.nii.gz > \${bname}_tail.json
     done
 
     scil_merge_json.py *_tail.json *_head.json ${sid}__endpoints_metric_stats.json \

@@ -428,7 +428,7 @@ process Bundle_Endpoints_Map {
 metrics_for_endpoints_roi_stats
     .mix(fixel_afd_for_endpoints_roi_stats)
     .groupTuple(by: 0).view()
-     .map{it -> [it[0], it[1..-1]]}.view()
+     .map{it -> [it[0], it[1..-1].flatten()]}.view()
     .set{test}
 
 test

@@ -476,12 +476,12 @@ process Bundle_Metrics_Stats_In_Endpoints {
 metrics_for_endpoints_metrics
     .mix(fixel_afd_for_endpoints_metrics)
     .groupTuple(by: 0)
-     .map{it -> [it[0], it[1..-1].flatten()]}
+    .map{it -> [it[0], it[1..-1].flatten()]}.view()
     .set{metrics_afd_for_endpoints_metrics}
 
-bundles_for_endpoints_metrics
+bundles_for_endpoints_metrics.view()
     .flatMap{ sid, bundles -> bundles.collect{[sid, it]} }
-    .combine(metrics_afd_for_endpoints_metrics, by: 0)
+    .combine(metrics_afd_for_endpoints_metrics, by: 0).view()
     .set{metrics_bundles_for_endpoints_metrics}
 
 process Bundle_Endpoints_Metrics {

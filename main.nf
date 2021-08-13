@@ -464,7 +464,7 @@ process Bundle_Metrics_Stats_In_Endpoints {
         if [ -f "\${bname}_afd_metric.nii.gz" ]; then
             b_metrics="!(*afd*|*head*|*tail*).nii.gz \${bname}_afd_metric.nii.gz"
         else
-            b_metrics=$metrics
+            b_metrics="$metrics"
         fi
 
         scil_compute_metrics_stats_in_ROI.py \${bname}_head.nii.gz $normalize_weights\
@@ -515,7 +515,7 @@ process Bundle_Endpoints_Metrics {
     if [ -f "\${bname}_afd_metric.nii.gz" ]; then
         b_metrics="!(*afd*).nii.gz \${bname}_afd_metric.nii.gz"
     else
-        b_metrics=$metrics
+        b_metrics="$metrics"
     fi
 
     scil_compute_endpoints_metric.py \$bundle \${b_metrics} \${bname}
@@ -565,7 +565,7 @@ process Bundle_Mean_Std {
         if [ -f "\${bname}_afd_metric.nii.gz" ]; then
             b_metrics="!(*afd*).nii.gz \${bname}_afd_metric.nii.gz"
         else
-            b_metrics=$metrics
+            b_metrics="$metrics"
         fi
         scil_compute_bundle_mean_std.py $density_weighting \$bname.trk \${b_metrics} >\
             \${bname}.json
@@ -700,7 +700,7 @@ process Bundle_Mean_Std_Per_Point {
         if [ -f "\${bname}_afd_metric.nii.gz" ]; then
             b_metrics="!(*afd*).nii.gz \${bname}_afd_metric.nii.gz"
         else
-            b_metrics=$metrics
+            b_metrics="$metrics"
         fi
 
         scil_compute_bundle_mean_std_per_point.py \$bname.trk \$label_map \$distance_map \

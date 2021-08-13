@@ -427,11 +427,11 @@ process Bundle_Endpoints_Map {
 
 metrics_for_endpoints_roi_stats
     .mix(fixel_afd_for_endpoints_roi_stats)
-    .groupTuple(by: 0).view()
-     .map{it -> [it[0], it[1..-1].flatten()]}.view()
-    .set{test}
+    .groupTuple(by: 0)
+     .map{it -> [it[0], it[1..-1].flatten()]}
+    .set{metrics_afd_for_endpoints_roi_stats}
 
-test
+metrics_afd_for_endpoints_roi_stats
     .combine(endpoints_maps_for_roi_stats, by: 0)
     .set{metrics_endpoints_for_roi_stats}
 
@@ -473,15 +473,20 @@ process Bundle_Metrics_Stats_In_Endpoints {
     """
 }
 
+metrics_for_endpoints_metrics
+    .mix(fixel_afd_for_endpoints_metrics)
+    .groupTuple(by: 0)
+     .map{it -> [it[0], it[1..-1].flatten()]}
+    .set{metrics_afd_for_endpoints_metrics}
+
 bundles_for_endpoints_metrics
     .flatMap{ sid, bundles -> bundles.collect{[sid, it]} }
-    .combine(metrics_for_endpoints_metrics, by: 0)
-    .combine(fixel_afd_for_endpoints_metrics, by: 0)
+    .combine(metrics_afd_for_endpoints_metrics, by: 0)
     .set{metrics_bundles_for_endpoints_metrics}
 
 process Bundle_Endpoints_Metrics {
     input:
-    set sid, file(bundle), file(metrics), file(afd) from metrics_bundles_for_endpoints_metrics
+    set sid, file(bundle), file(metrics) from metrics_bundles_for_endpoints_metrics
 
     output:
     file "*/*_endpoints_metric.nii.gz"
@@ -491,6 +496,7 @@ process Bundle_Endpoints_Metrics {
 
     script:
     """
+    shopt -s extglob
     bundle=$bundle
     if [[ \$bundle == *"__"* ]]; then
         pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
@@ -502,7 +508,7 @@ process Bundle_Endpoints_Metrics {
     bname=\${bname/_uniformized/}
     mkdir \${bname}
 
-    scil_compute_endpoints_metric.py \$bundle $metrics \${bname}_afd_metric.nii.gz \${bname}
+    scil_compute_endpoints_metric.py \$bundle !(*afd*).nii.gz \${bname}_afd_metric.nii.gz \${bname}
     cd \${bname}
     for i in *.nii.gz;
     do
@@ -514,12 +520,17 @@ process Bundle_Endpoints_Metrics {
 }
 
 metrics_for_mean_std
+    .mix(fixel_afd_for_mean_std)
+    .groupTuple(by: 0)
+     .map{it -> [it[0], it[1..-1].flatten()]}
+    .set{metrics_afd_for_mean_std}
+
+metrics_afd_for_mean_std
     .combine(bundles_for_mean_std, by: 0)
-    .combine(fixel_afd_for_mean_std, by: 0)
     .set{metrics_bundles_for_mean_std}
 process Bundle_Mean_Std {
     input:
-    set sid, file(metrics), file(bundles), file(afd) from metrics_bundles_for_mean_std
+    set sid, file(metrics), file(bundles) from metrics_bundles_for_mean_std
 
     output:
     file "${sid}__mean_std.json" into mean_std_to_aggregate
@@ -529,6 +540,7 @@ process Bundle_Mean_Std {
         params.mean_std_density_weighting ? '--density_weighting' : ''
     String bundles_list = bundles.join(", ").replace(',', '')
     """
+    shopt -s extglob
     for bundle in $bundles_list;
         do if [[ \$bundle == *"__"* ]]; then
             pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
@@ -539,7 +551,7 @@ process Bundle_Mean_Std {
         fi
         bname=\${bname/_uniformized/}
         mv \$bundle \$bname.trk
-        scil_compute_bundle_mean_std.py $density_weighting \$bname.trk $metrics \${bname}_afd_metric.nii.gz >\
+        scil_compute_bundle_mean_std.py $density_weighting \$bname.trk !(*afd*).nii.gz \${bname}_afd_metric.nii.gz >\
             \${bname}.json
     done
     scil_merge_json.py *.json ${sid}__mean_std.json --no_list --add_parent_key ${sid}
@@ -629,14 +641,19 @@ process Bundle_Volume_Per_Label {
 }
 
 metrics_for_mean_std_per_point
+    .mix(fixel_afd_for_mean_std_per_point)
+    .groupTuple(by: 0)
+     .map{it -> [it[0], it[1..-1].flatten()]}
+    .set{metrics_afd_for_std_per_point}
+
+metrics_afd_for_std_per_point
     .join(bundles_for_mean_std_per_point, by: 0)
     .join(label_distance_maps_for_mean_std_per_point, by: 0)
-    .combine(fixel_afd_for_mean_std_per_point, by: 0)
     .set{metrics_bundles_label_distance_maps_for_mean_std_per_point}
 
 process Bundle_Mean_Std_Per_Point {
     input:
-    set sid, file(metrics), file(bundles), file(label_maps), file(distance_maps), file(afd) \
+    set sid, file(metrics), file(bundles), file(label_maps), file(distance_maps) \
          from metrics_bundles_label_distance_maps_for_mean_std_per_point
 
     output:
@@ -650,6 +667,7 @@ process Bundle_Mean_Std_Per_Point {
         params.mean_std_per_point_density_weighting ? '--density_weighting' : ''
     String bundles_list = bundles.join(", ").replace(',', '')
     """
+    shopt -s extglob
     for bundle in $bundles_list;
         do if [[ \$bundle == *"__"* ]]; then
             pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
@@ -664,7 +682,7 @@ process Bundle_Mean_Std_Per_Point {
         distance_map=${sid}__\${bname}_distances.npz
 
         scil_compute_bundle_mean_std_per_point.py \$bname.trk \$label_map \$distance_map \
-            $metrics \${bname}_afd_metric.nii.gz --sort_keys $density_weighting > \$bname.json
+            !(*afd*).nii.gz \${bname}_afd_metric.nii.gz --sort_keys $density_weighting > \$bname.json
         done
         scil_merge_json.py *.json ${sid}__mean_std_per_point.json --no_list \
             --add_parent_key ${sid}

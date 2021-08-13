@@ -461,11 +461,16 @@ process Bundle_Metrics_Stats_In_Endpoints {
         bname=\${bname/_endpoints_map_head/}
         mv \$map \${bname}_head.nii.gz
         mv \${map/_head/_tail} \${bname}_tail.nii.gz
+        if [ -f "\${bname}_afd_metric.nii.gz" ]; then
+            b_metrics="!(*afd*|*head*|*tail*).nii.gz \${bname}_afd_metric.nii.gz"
+        else
+            b_metrics=\$metrics
+        fi
 
         scil_compute_metrics_stats_in_ROI.py \${bname}_head.nii.gz $normalize_weights\
-            --metrics !(*afd*|*head*|*tail*).nii.gz \${bname}_afd_metric.nii.gz > \${bname}_head.json
+            --metrics \${b_metrics} > \${bname}_head.json
         scil_compute_metrics_stats_in_ROI.py \${bname}_tail.nii.gz $normalize_weights\
-            --metrics !(*afd*|*head*|*tail*).nii.gz \${bname}_afd_metric.nii.gz > \${bname}_tail.json
+            --metrics \${b_metrics} > \${bname}_tail.json
     done
 
     scil_merge_json.py *_tail.json *_head.json ${sid}__endpoints_metric_stats.json \
@@ -507,8 +512,13 @@ process Bundle_Endpoints_Metrics {
     fi
     bname=\${bname/_uniformized/}
     mkdir \${bname}
+    if [ -f "\${bname}_afd_metric.nii.gz" ]; then
+        b_metrics="!(*afd*).nii.gz \${bname}_afd_metric.nii.gz"
+    else
+        b_metrics=\$metrics
+    fi
 
-    scil_compute_endpoints_metric.py \$bundle !(*afd*).nii.gz \${bname}_afd_metric.nii.gz \${bname}
+    scil_compute_endpoints_metric.py \$bundle \${b_metrics} \${bname}
     cd \${bname}
     for i in *.nii.gz;
     do
@@ -551,7 +561,13 @@ process Bundle_Mean_Std {
         fi
         bname=\${bname/_uniformized/}
         mv \$bundle \$bname.trk
-        scil_compute_bundle_mean_std.py $density_weighting \$bname.trk !(*afd*).nii.gz \${bname}_afd_metric.nii.gz >\
+
+        if [ -f "\${bname}_afd_metric.nii.gz" ]; then
+            b_metrics="!(*afd*).nii.gz \${bname}_afd_metric.nii.gz"
+        else
+            b_metrics=\$metrics
+        fi
+        scil_compute_bundle_mean_std.py $density_weighting \$bname.trk \${b_metrics} >\
             \${bname}.json
     done
     scil_merge_json.py *.json ${sid}__mean_std.json --no_list --add_parent_key ${sid}
@@ -681,8 +697,14 @@ process Bundle_Mean_Std_Per_Point {
         label_map=${sid}__\${bname}_labels.npz
         distance_map=${sid}__\${bname}_distances.npz
 
+        if [ -f "\${bname}_afd_metric.nii.gz" ]; then
+            b_metrics="!(*afd*).nii.gz \${bname}_afd_metric.nii.gz"
+        else
+            b_metrics=\$metrics
+        fi
+
         scil_compute_bundle_mean_std_per_point.py \$bname.trk \$label_map \$distance_map \
-            !(*afd*).nii.gz \${bname}_afd_metric.nii.gz --sort_keys $density_weighting > \$bname.json
+            \${b_metrics} --sort_keys $density_weighting > \$bname.json
         done
         scil_merge_json.py *.json ${sid}__mean_std_per_point.json --no_list \
             --add_parent_key ${sid}

@@ -49,7 +49,7 @@ workflow.onComplete {
 Channel
     .fromFilePairs("$params.input/**/bundles/*.trk",
                    size: -1) { it.parent.parent.name }
-    .set{bundles_for_rm_invalid}
+    .into{bundles_for_rm_invalid; bundles_for_fixel_afd}
 
 Channel
     .fromFilePairs("$params.input/**/metrics/*.nii.gz",
@@ -65,6 +65,11 @@ Channel
     .fromFilePairs("$params.input/**/*lesion_mask.nii.gz",
         size: -1) { it.parent.name }
     .set{lesion_for_lesion_load}
+
+Channel
+    .fromFilePairs("$params.input/**/*fodf.nii.gz",
+        size: -1) { it.parent.name }
+    .set{fodf_for_fixel_afd}
 
 in_metrics
     .set{metrics_for_rename}
@@ -85,18 +90,46 @@ process Rename_Metrics {
     done
     """
 }
+bundles_for_fixel_afd
+    .join(fodf_for_fixel_afd)
+    .set{bundle_fodf_for_fixel_afd}
+
+process Fixel_AFD {
+    input:
+    set sid, file(bundles), file(fodf) from bundle_fodf_for_fixel_afd
+
+    output:
+    set sid, "*_afd_metric.nii.gz" into fixel_afd_for_mean_std,
+        fixel_afd_for_endpoints_metrics, fixel_afd_for_endpoints_roi_stats,
+        fixel_afd_for_mean_std_per_point
+
+    script:
+    String bundles_list = bundles.join(", ").replace(',', '')
+    """
+    for bundle in $bundles_list;
+        do if [[ \$bundle == *"__"* ]]; then
+            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
+            bname=\${bundle:\$pos}
+            bname=\$(basename \$bname .trk)
+        else
+            bname=\$(basename \$bundle .trk)
+        fi
+        scil_compute_mean_fixel_afd_from_bundles.py \$bundle $fodf \${bname}_afd_metric.nii.gz
+    done
+    """
+}
 
 process Remove_Invalid_Streamlines {
-  input:
+    input:
     set sid, file(bundles) from bundles_for_rm_invalid
 
-  output:
+    output:
     set sid, "${sid}__*_ic.trk" into bundles_for_label_and_distance_map, bundles_for_centroids
 
-  script:
-  String bundles_list = bundles.join(", ").replace(',', '')
-  """
-  for bundle in $bundles_list;
+    script:
+    String bundles_list = bundles.join(", ").replace(',', '')
+    """
+    for bundle in $bundles_list;
       do if [[ \$bundle == *"__"* ]]; then
           pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
           bname=\${bundle:\$pos}
@@ -107,8 +140,8 @@ process Remove_Invalid_Streamlines {
       bname=\${bname/$params.bundle_suffix_to_remove/}
 
       scil_remove_invalid_streamlines.py \$bundle ${sid}__\${bname}_ic.trk --cut_invalid -f
-  done
-  """
+    done
+    """
 }
 
 process Bundle_Centroid {
@@ -391,13 +424,20 @@ process Bundle_Endpoints_Map {
         --no_list --add_parent_key ${sid}
     """
 }
+
 metrics_for_endpoints_roi_stats
+    .mix(fixel_afd_for_endpoints_roi_stats)
+    .groupTuple(by: 0)
+     .map{it -> [it[0], it[1..-1].flatten()]}
+    .set{metrics_afd_for_endpoints_roi_stats}
+
+metrics_afd_for_endpoints_roi_stats
     .combine(endpoints_maps_for_roi_stats, by: 0)
     .set{metrics_endpoints_for_roi_stats}
 
 process Bundle_Metrics_Stats_In_Endpoints {
     input:
-    set sid, file(metrics), file(endpoints_map_head), file(endpoints_map_tail) \
+    set sid, file(metrics), file(endpoints_map_head), file(endpoints_map_tail)\
          from metrics_endpoints_for_roi_stats
 
     output:
@@ -409,6 +449,7 @@ process Bundle_Metrics_Stats_In_Endpoints {
             '--normalize_weights' : '--bin'
     String map_list = endpoints_map_head.join(", ").replace(',', '')
     """
+    shopt -s extglob
     for map in $map_list;
         do if [[ \$map == *"__"* ]]; then
             pos=\$((\$(echo \$map | grep -b -o __ | cut -d: -f1)+2))
@@ -420,11 +461,16 @@ process Bundle_Metrics_Stats_In_Endpoints {
         bname=\${bname/_endpoints_map_head/}
         mv \$map \${bname}_head.nii.gz
         mv \${map/_head/_tail} \${bname}_tail.nii.gz
+        if [ -f "\${bname}_afd_metric.nii.gz" ]; then
+            b_metrics="!(*afd*|*head*|*tail*).nii.gz \${bname}_afd_metric.nii.gz"
+        else
+            b_metrics="$metrics"
+        fi
 
         scil_compute_metrics_stats_in_ROI.py \${bname}_head.nii.gz $normalize_weights\
-            --metrics $metrics > \${bname}_head.json
+            --metrics \${b_metrics} > \${bname}_head.json
         scil_compute_metrics_stats_in_ROI.py \${bname}_tail.nii.gz $normalize_weights\
-            --metrics $metrics > \${bname}_tail.json
+            --metrics \${b_metrics} > \${bname}_tail.json
     done
 
     scil_merge_json.py *_tail.json *_head.json ${sid}__endpoints_metric_stats.json \
@@ -432,9 +478,15 @@ process Bundle_Metrics_Stats_In_Endpoints {
     """
 }
 
+metrics_for_endpoints_metrics
+    .mix(fixel_afd_for_endpoints_metrics)
+    .groupTuple(by: 0)
+    .map{it -> [it[0], it[1..-1].flatten()]}
+    .set{metrics_afd_for_endpoints_metrics}
+
 bundles_for_endpoints_metrics
     .flatMap{ sid, bundles -> bundles.collect{[sid, it]} }
-    .combine(metrics_for_endpoints_metrics, by: 0)
+    .combine(metrics_afd_for_endpoints_metrics, by: 0)
     .set{metrics_bundles_for_endpoints_metrics}
 
 process Bundle_Endpoints_Metrics {
@@ -449,6 +501,7 @@ process Bundle_Endpoints_Metrics {
 
     script:
     """
+    shopt -s extglob
     bundle=$bundle
     if [[ \$bundle == *"__"* ]]; then
         pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
@@ -459,8 +512,13 @@ process Bundle_Endpoints_Metrics {
     fi
     bname=\${bname/_uniformized/}
     mkdir \${bname}
+    if [ -f "\${bname}_afd_metric.nii.gz" ]; then
+        b_metrics="!(*afd*).nii.gz \${bname}_afd_metric.nii.gz"
+    else
+        b_metrics="$metrics"
+    fi
 
-    scil_compute_endpoints_metric.py \$bundle $metrics \${bname}
+    scil_compute_endpoints_metric.py \$bundle \${b_metrics} \${bname}
     cd \${bname}
     for i in *.nii.gz;
     do
@@ -472,6 +530,12 @@ process Bundle_Endpoints_Metrics {
 }
 
 metrics_for_mean_std
+    .mix(fixel_afd_for_mean_std)
+    .groupTuple(by: 0)
+     .map{it -> [it[0], it[1..-1].flatten()]}
+    .set{metrics_afd_for_mean_std}
+
+metrics_afd_for_mean_std
     .combine(bundles_for_mean_std, by: 0)
     .set{metrics_bundles_for_mean_std}
 process Bundle_Mean_Std {
@@ -486,6 +550,7 @@ process Bundle_Mean_Std {
         params.mean_std_density_weighting ? '--density_weighting' : ''
     String bundles_list = bundles.join(", ").replace(',', '')
     """
+    shopt -s extglob
     for bundle in $bundles_list;
         do if [[ \$bundle == *"__"* ]]; then
             pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
@@ -496,7 +561,13 @@ process Bundle_Mean_Std {
         fi
         bname=\${bname/_uniformized/}
         mv \$bundle \$bname.trk
-        scil_compute_bundle_mean_std.py $density_weighting \$bname.trk $metrics >\
+
+        if [ -f "\${bname}_afd_metric.nii.gz" ]; then
+            b_metrics="!(*afd*).nii.gz \${bname}_afd_metric.nii.gz"
+        else
+            b_metrics="$metrics"
+        fi
+        scil_compute_bundle_mean_std.py $density_weighting \$bname.trk \${b_metrics} >\
             \${bname}.json
     done
     scil_merge_json.py *.json ${sid}__mean_std.json --no_list --add_parent_key ${sid}
@@ -586,6 +657,12 @@ process Bundle_Volume_Per_Label {
 }
 
 metrics_for_mean_std_per_point
+    .mix(fixel_afd_for_mean_std_per_point)
+    .groupTuple(by: 0)
+     .map{it -> [it[0], it[1..-1].flatten()]}
+    .set{metrics_afd_for_std_per_point}
+
+metrics_afd_for_std_per_point
     .join(bundles_for_mean_std_per_point, by: 0)
     .join(label_distance_maps_for_mean_std_per_point, by: 0)
     .set{metrics_bundles_label_distance_maps_for_mean_std_per_point}
@@ -606,6 +683,7 @@ process Bundle_Mean_Std_Per_Point {
         params.mean_std_per_point_density_weighting ? '--density_weighting' : ''
     String bundles_list = bundles.join(", ").replace(',', '')
     """
+    shopt -s extglob
     for bundle in $bundles_list;
         do if [[ \$bundle == *"__"* ]]; then
             pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
@@ -619,8 +697,14 @@ process Bundle_Mean_Std_Per_Point {
         label_map=${sid}__\${bname}_labels.npz
         distance_map=${sid}__\${bname}_distances.npz
 
+        if [ -f "\${bname}_afd_metric.nii.gz" ]; then
+            b_metrics="!(*afd*).nii.gz \${bname}_afd_metric.nii.gz"
+        else
+            b_metrics="$metrics"
+        fi
+
         scil_compute_bundle_mean_std_per_point.py \$bname.trk \$label_map \$distance_map \
-            $metrics --sort_keys $density_weighting > \$bname.json
+            \${b_metrics} --sort_keys $density_weighting > \$bname.json
         done
         scil_merge_json.py *.json ${sid}__mean_std_per_point.json --no_list \
             --add_parent_key ${sid}

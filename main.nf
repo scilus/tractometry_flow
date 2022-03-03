@@ -222,12 +222,15 @@ process Bundle_Label_And_Distance_Maps {
         bundles_centroids_for_label_and_distance_map
 
     output:
-    set sid, "${sid}__*_labels.npz", "${sid}__*_distances.npz" into\
+    set sid, "${sid}__*_labels.npz", "${sid}__*_distances.npz", "${sid}__*_correlation.npz" into\
         label_distance_maps_for_mean_std_per_point
     set sid, "${sid}__*_labels.trk" into bundles_for_uniformize
     file "${sid}__*_distances.trk"
+    file "${sid}__*_correlation.trk"
     set sid, "${sid}__*_labels.nii.gz" into voxel_label_maps_for_volume,
                                             voxel_label_map_for_lesion_load
+    set sid, "${sid}__*_distances.nii.gz"
+    set sid, "${sid}__*_correlation.nii.gz"
 
     script:
     String bundles_list = bundles.join(", ").replace(',', '')
@@ -243,15 +246,23 @@ process Bundle_Label_And_Distance_Maps {
         bname=\${bname/_ic/}
  
         centroid=${sid}__\${bname}_centroid_${params.nb_points}.trk
-        scil_compute_bundle_voxel_label_map.py \$bundle \${centroid} \
-            ${sid}__\${bname}_labels.nii.gz \
-            --out_labels_npz ${sid}__\${bname}_labels.npz \
-            --out_distances_npz ${sid}__\${bname}_distances.npz \
-            --labels_color_dpp ${sid}__\${bname}_labels.trk \
-            --distances_color_dpp ${sid}__\${bname}_distances.trk \
+        scil_compute_bundle_voxel_label_map.py \$bundle \${centroid} tmp_out\
             --min_streamline_count ${params.min_streamline_count} \
-            --min_voxel_count ${params.min_voxel_count}
-        done
+            --min_voxel_count ${params.min_voxel_count} -f --new
+            
+        mv tmp_out/labels_map.nii.gz ${sid}__\${bname}_labels.nii.gz
+        mv tmp_out/corr_map.nii.gz ${sid}__\${bname}_correlation.nii.gz
+        mv tmp_out/distances_map.nii.gz ${sid}__\${bname}_distances.nii.gz
+
+        mv tmp_out/_0/mapping_labels.npz ${sid}__\${bname}_labels.npz
+        mv tmp_out/_0/mapping_corr.npz ${sid}__\${bname}_correlation.npz
+        mv tmp_out/_0/mapping_dists.npz ${sid}__\${bname}_distances.npz
+
+        mv tmp_out/_0/labels.trk ${sid}__\${bname}_labels.trk
+        mv tmp_out/_0/corr.trk ${sid}__\${bname}_correlation.trk
+        mv tmp_out/_0/dists.trk ${sid}__\${bname}_distances.trk
+
+    done
     """
 }
 
@@ -669,7 +680,7 @@ metrics_afd_for_std_per_point
 
 process Bundle_Mean_Std_Per_Point {
     input:
-    set sid, file(metrics), file(bundles), file(label_maps), file(distance_maps) \
+    set sid, file(metrics), file(bundles), file(label_maps), file(distance_maps), file(correlation_maps) \
          from metrics_bundles_label_distance_maps_for_mean_std_per_point
 
     output:
@@ -703,7 +714,7 @@ process Bundle_Mean_Std_Per_Point {
             b_metrics="$metrics"
         fi
 
-        scil_compute_bundle_mean_std_per_point.py \$bname.trk \$label_map \$distance_map \
+        scil_compute_bundle_mean_std_per_point.py \$bname.trk \$label_map \
             \${b_metrics} --sort_keys $density_weighting > \$bname.json
         done
         scil_merge_json.py *.json ${sid}__mean_std_per_point.json --no_list \
@@ -725,7 +736,7 @@ process Plot_Mean_Std_Per_Point {
     """
     echo '$json_str' >> colors.json
     scil_plot_mean_std_per_point.py $mean_std_per_point tmp_dir/ --dict_colors \
-        colors.json
+        colors.json --nb_pts $params.nb_points
     mv tmp_dir/* ./
     """
 }
@@ -743,7 +754,7 @@ process Plot_Lesions_Per_Point {
     echo '$json_str' >> colors.json
     scil_merge_json.py $lesion_per_point tmp.json --recursive --average_last_layer
     scil_plot_mean_std_per_point.py tmp.json tmp_dir/ --dict_colors \
-        colors.json
+        colors.json --nb_pts $params.nb_points
     mv tmp_dir/* ./
     """
 }
@@ -998,7 +1009,7 @@ process Plot_Population_Mean_Std_Per_Point {
     """
     echo '$json_str' >> colors.json
     scil_plot_mean_std_per_point.py $json_a tmp_dir/ --dict_colors colors.json \
-        --stats_over_population
+        --stats_over_population --nb_pts $params.nb_points
     mv tmp_dir/* ./
     """
 }

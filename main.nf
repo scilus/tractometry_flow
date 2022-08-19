@@ -114,6 +114,7 @@ process Fixel_AFD {
         else
             bname=\$(basename \$bundle .trk)
         fi
+        bname=\${bname/$params.bundle_suffix_to_remove/}
         scil_compute_mean_fixel_afd_from_bundles.py \$bundle $fodf \${bname}_afd_metric.nii.gz
     done
     """

@@ -363,7 +363,7 @@ process Color_Bundle {
     String bundles_list = bundles.join(", ").replace(',', '')
     """
     echo '$json_str' >> colors.json
-    scil_assign_color_to_tractogram.py $bundles_list --dict_colors colors.json
+    scil_assign_uniform_color_to_tractograms.py $bundles_list --dict_colors colors.json
     """
 }
 

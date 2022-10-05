@@ -222,15 +222,12 @@ process Bundle_Label_And_Distance_Maps {
         bundles_centroids_for_label_and_distance_map
 
     output:
-    set sid, "${sid}__*_labels.npz", "${sid}__*_distances.npz", "${sid}__*_correlation.npz" into\
+    set sid, "${sid}__*_labels.nii.gz", "${sid}__*_distances.nii.gz" into\
         label_distance_maps_for_mean_std_per_point
     set sid, "${sid}__*_labels.trk" into bundles_for_uniformize
     file "${sid}__*_distances.trk"
-    file "${sid}__*_correlation.trk"
     set sid, "${sid}__*_labels.nii.gz" into voxel_label_maps_for_volume,
                                             voxel_label_map_for_lesion_load
-    set sid, "${sid}__*_distances.nii.gz"
-    set sid, "${sid}__*_correlation.nii.gz"
 
     script:
     String bundles_list = bundles.join(", ").replace(',', '')
@@ -248,19 +245,13 @@ process Bundle_Label_And_Distance_Maps {
         centroid=${sid}__\${bname}_centroid_${params.nb_points}.trk
         scil_compute_bundle_voxel_label_map.py \$bundle \${centroid} tmp_out\
             --min_streamline_count ${params.min_streamline_count} \
-            --min_voxel_count ${params.min_voxel_count} -f --new
+            --min_voxel_count ${params.min_voxel_count} -f
             
         mv tmp_out/labels_map.nii.gz ${sid}__\${bname}_labels.nii.gz
-        mv tmp_out/corr_map.nii.gz ${sid}__\${bname}_correlation.nii.gz
-        mv tmp_out/distances_map.nii.gz ${sid}__\${bname}_distances.nii.gz
+        mv tmp_out/distance_map.nii.gz ${sid}__\${bname}_distances.nii.gz
 
-        mv tmp_out/_0/mapping_labels.npz ${sid}__\${bname}_labels.npz
-        mv tmp_out/_0/mapping_corr.npz ${sid}__\${bname}_correlation.npz
-        mv tmp_out/_0/mapping_dists.npz ${sid}__\${bname}_distances.npz
-
-        mv tmp_out/_0/labels.trk ${sid}__\${bname}_labels.trk
-        mv tmp_out/_0/corr.trk ${sid}__\${bname}_correlation.trk
-        mv tmp_out/_0/dists.trk ${sid}__\${bname}_distances.trk
+        mv tmp_out/labels.trk ${sid}__\${bname}_labels.trk
+        mv tmp_out/distance.trk ${sid}__\${bname}_distances.trk
 
     done
     """
@@ -680,7 +671,7 @@ metrics_afd_for_std_per_point
 
 process Bundle_Mean_Std_Per_Point {
     input:
-    set sid, file(metrics), file(bundles), file(label_maps), file(distance_maps), file(correlation_maps) \
+    set sid, file(metrics), file(bundles), file(label_maps), file(distance_maps) \
          from metrics_bundles_label_distance_maps_for_mean_std_per_point
 
     output:
@@ -705,8 +696,8 @@ process Bundle_Mean_Std_Per_Point {
         fi
         bname=\${bname/_uniformized/}
         mv \$bundle \$bname.trk
-        label_map=${sid}__\${bname}_labels.npz
-        distance_map=${sid}__\${bname}_distances.npz
+        label_map=${sid}__\${bname}_labels.nii.gz
+        distance_map=${sid}__\${bname}_distances.nii.gz
 
         if [ -f "\${bname}_afd_metric.nii.gz" ]; then
             b_metrics="!(*afd*).nii.gz \${bname}_afd_metric.nii.gz"

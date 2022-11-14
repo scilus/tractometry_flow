@@ -68,8 +68,8 @@ OPTIONAL ARGUMENTS (current value)
 --use_provided_centroids                    Use the provided pre-computed centroids rather than using automatic computation ($use_provided_centroids)
 --bundle_suffix_to_remove                   Use to remove the suffix from RBx-Flow ($bundle_suffix_to_remove)
 
---min_streamline_count                      Minimum streamline count threshold from trimming of 'edges' in the voxel labels map
---min_voxel_count                           Minimum voxel count threshold from trimming of 'edges' in the voxel labels map
+--min_streamline_count                      Minimum streamline count threshold from trimming of 'edges' in the voxel labels map ($min_streamline_count)
+--min_voxel_count                           Minimum voxel count threshold from trimming of 'edges' in the voxel labels map ($min_voxel_count)
 
 --mean_std_density_weighting                Weight the mean/std by the local tract density ($mean_std_density_weighting)
 --mean_std_per_point_density_weighting      Weight the mean/std per point by the local tract density ($mean_std_per_point_density_weighting)

@@ -49,7 +49,7 @@ workflow.onComplete {
 Channel
     .fromFilePairs("$params.input/**/bundles/*.trk",
                    size: -1) { it.parent.parent.name }
-    .into{bundles_for_rm_invalid; bundles_for_fixel_afd}
+    .into{bundles_for_rm_invalid; in_bundles_check; bundles_for_fixel_afd}
 
 Channel
     .fromFilePairs("$params.input/**/metrics/*.nii.gz",
@@ -73,6 +73,18 @@ Channel
 
 in_metrics
     .set{metrics_for_rename}
+
+
+in_bundles_check.map{it[1]}.flatten().count().set{number_bundles_for_compare}
+in_centroids_check.map{it[1]}.flatten().count().set{number_centroids_for_compare}
+
+if (params.use_provided_centroids){
+number_centroids_for_compare
+    .concat(number_bundles_for_compare)
+    .toList()
+    .subscribe{a, b -> if (a < b)
+    error "Error ~ You ask the pipeline to use provided centroids but there are less centroids than bundles.\nPlease provide at least a centroid per bundle."}
+}
 
 process Rename_Metrics {
     input:
@@ -242,7 +254,7 @@ process Bundle_Label_And_Distance_Maps {
             bname=\$(basename \$bundle .trk)
         fi
         bname=\${bname/_ic/}
- 
+
         centroid=${sid}__\${bname}_centroid_${params.nb_points}.trk
         scil_compute_bundle_voxel_label_map.py \$bundle \${centroid} \
             ${sid}__\${bname}_labels.nii.gz \
@@ -339,11 +351,11 @@ process Lesion_Load {
     cd streamlines_stats
     scil_merge_json.py *.json ../${sid}__lesion_streamlines_stats.json \
         --add_parent_key ${sid}
-    
+
     cd ../lesion_load
     scil_merge_json.py *.json ../${sid}__lesion_load.json \
         --add_parent_key ${sid}
-    
+
     cd ../lesion_load_per_point
     scil_merge_json.py *.json ../${sid}__lesion_load_per_point.json \
         --add_parent_key ${sid}

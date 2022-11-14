@@ -14,11 +14,14 @@ DESCRIPTION
                             [root]
                             ├── S1
                             │   ├── *lesion_mask.nii.gz (optional)
+                            │   ├── *fodf.nii.gz (optional to generate fixel AFD)
                             │   ├── metrics
                             │   │   └── *.nii.gz
                             │   └── bundles
                             │       └── *.trk
                             └── S2
+                                ├── *lesion_mask.nii.gz (optional)
+                                ├── *fodf.nii.gz (optional to generate fixel AFD)
                                 ├── metrics
                                 │   └── *.nii.gz
                                 └── bundles

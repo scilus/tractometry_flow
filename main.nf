@@ -209,9 +209,9 @@ process Resample_Centroid {
         bname=\${bname/_centroid/}
         bname=\${bname/_ic/}
 
-        scil_resample_streamlines.py \$bundle \
+        echo \$(scil_resample_streamlines.py \$bundle \
             "${sid}__\${bname}_centroid_${params.nb_points}.trk" \
-            --nb_pts_per_streamline $params.nb_points -f
+            --nb_pts_per_streamline $params.nb_points -f)
     done
     """
 }
@@ -256,15 +256,17 @@ process Bundle_Label_And_Distance_Maps {
         bname=\${bname/_ic/}
 
         centroid=${sid}__\${bname}_centroid_${params.nb_points}.trk
-        scil_compute_bundle_voxel_label_map.py \$bundle \${centroid} tmp_out\
-            --min_streamline_count ${params.min_streamline_count} \
-            --min_voxel_count ${params.min_voxel_count} -f
-            
-        mv tmp_out/labels_map.nii.gz ${sid}__\${bname}_labels.nii.gz
-        mv tmp_out/distance_map.nii.gz ${sid}__\${bname}_distances.nii.gz
+        if [[ -f \${centroid} ]]; then
+            scil_compute_bundle_voxel_label_map.py \$bundle \${centroid} tmp_out\
+                --min_streamline_count ${params.min_streamline_count} \
+                --min_voxel_count ${params.min_voxel_count} -f
 
-        mv tmp_out/labels.trk ${sid}__\${bname}_labels.trk
-        mv tmp_out/distance.trk ${sid}__\${bname}_distances.trk
+            mv tmp_out/labels_map.nii.gz ${sid}__\${bname}_labels.nii.gz
+            mv tmp_out/distance_map.nii.gz ${sid}__\${bname}_distances.nii.gz
+
+            mv tmp_out/labels.trk ${sid}__\${bname}_labels.trk
+            mv tmp_out/distance.trk ${sid}__\${bname}_distances.trk
+        fi
 
     done
     """

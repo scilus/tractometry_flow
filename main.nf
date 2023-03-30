@@ -152,7 +152,7 @@ process Remove_Invalid_Streamlines {
       fi
       bname=\${bname/$params.bundle_suffix_to_remove/}
 
-      scil_remove_invalid_streamlines.py \$bundle ${sid}__\${bname}_ic.trk --cut_invalid -f
+      scil_remove_invalid_streamlines.py \$bundle ${sid}__\${bname}_ic.trk --remove_single_point --remove_overlapping_points --cut_invalid --no_empty
     done
     """
 }

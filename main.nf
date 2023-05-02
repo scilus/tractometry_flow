@@ -535,7 +535,7 @@ process Bundle_Endpoints_Metrics {
         b_metrics="$metrics"
     fi
 
-    scil_compute_endpoints_metric.py \$bundle \${b_metrics} \${bname}
+    scil_project_streamlines_to_map.py \$bundle \${bname} --in_metrics \${b_metrics} 
     cd \${bname}
     for i in *.nii.gz;
     do
@@ -782,6 +782,7 @@ process Aggregate_All_Lesion_Load {
     script:
     """
     scil_merge_json.py $jsons lesion_load.json --average_last_layer --recursive
+    scil_harmonize_json.py lesion_load.json lesion_load.json -f -v --sort_keys
     scil_convert_json_to_xlsx.py lesion_load.json lesion_load.xlsx
     """
 }
@@ -809,6 +810,7 @@ process Aggregate_All_Lesion_Load_Per_Point {
     done
     scil_merge_json.py *_avg.json lesion_load_per_point.json  \
         --recursive
+    scil_harmonize_json.py lesion_load_per_point.json lesion_load_per_point.json -f -v --sort_keys
     scil_convert_json_to_xlsx.py lesion_load_per_point.json lesion_load_per_point.xlsx \
         --stats_over_population
     """
@@ -832,6 +834,7 @@ process Aggregate_All_Endpoints_Map {
     script:
     """
     scil_merge_json.py $jsons endpoints_map.json --no_list
+    scil_harmonize_json.py endpoints_map.json endpoints_map.json -f -v --sort_keys
     scil_convert_json_to_xlsx.py endpoints_map.json endpoints_map.xlsx
     """
 }
@@ -854,6 +857,7 @@ process Aggregate_All_Endpoints_Metric_Stats {
     script:
     """
     scil_merge_json.py $jsons endpoints_metric_stats.json --no_list
+    scil_harmonize_json.py endpoints_metric_stats.json endpoints_metric_stats.json -f -v --sort_keys
     scil_convert_json_to_xlsx.py endpoints_metric_stats.json endpoints_metric_stats.xlsx
     """
 }
@@ -876,6 +880,7 @@ process Aggregate_All_Bundle_Length_Stats {
     script:
     """
     scil_merge_json.py $jsons length_stats.json --no_list
+    scil_harmonize_json.py length_stats.json length_stats.json -f -v --sort_keys
     scil_convert_json_to_xlsx.py length_stats.json length_stats.xlsx
     """
 }
@@ -898,6 +903,7 @@ process Aggregate_All_mean_std {
     script:
     """
     scil_merge_json.py $jsons mean_std.json --no_list
+    scil_harmonize_json.py mean_std.json mean_std.json -f -v --sort_keys
     scil_convert_json_to_xlsx.py mean_std.json mean_std.xlsx
     """
 }
@@ -920,6 +926,7 @@ process Aggregate_All_Volume {
     script:
     """
     scil_merge_json.py $jsons volumes.json --no_list
+    scil_harmonize_json.py volumes.json volumes.json -f -v --sort_keys
     scil_convert_json_to_xlsx.py volumes.json volumes.xlsx
     """
 }
@@ -942,6 +949,7 @@ process Aggregate_All_Streamline_Count {
     script:
     """
     scil_merge_json.py $jsons streamline_count.json --no_list
+    scil_harmonize_json.py streamline_count.json streamline_count.json -f -v --sort_keys
     scil_convert_json_to_xlsx.py streamline_count.json streamline_count.xlsx
     """
 }
@@ -964,6 +972,7 @@ process Aggregate_All_Volume_Per_Label {
     script:
     """
     scil_merge_json.py $jsons volume_per_label.json --no_list
+    scil_harmonize_json.py volume_per_label.json volume_per_label.json -f -v --sort_keys
     scil_convert_json_to_xlsx.py volume_per_label.json volume_per_label.xlsx
     """
 }
@@ -991,6 +1000,7 @@ process Aggregate_All_Mean_Std_Per_Point {
     done
     scil_merge_json.py *_avg.json mean_std_per_point.json  \
         --recursive
+    scil_harmonize_json.py mean_std_per_point.json mean_std_per_point.json -f -v --sort_keys
     scil_convert_json_to_xlsx.py mean_std_per_point.json mean_std_per_point.xlsx \
         --stats_over_population
     """

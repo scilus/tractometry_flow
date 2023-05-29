@@ -482,7 +482,7 @@ process Bundle_Metrics_Stats_In_Endpoints {
         mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
         b_metrics=($metrics)
         b_metrics="\${b_metrics[@]//*afd_metric*}"
-        b_metrics+="afd_metric.nii.gz"
+        b_metrics+=" afd_metric.nii.gz"
 
         scil_compute_metrics_stats_in_ROI.py \${bname}_head.nii.gz $normalize_weights\
             --metrics \${b_metrics} > \${bname}_head.json
@@ -533,7 +533,7 @@ process Bundle_Endpoints_Metrics {
     mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
     b_metrics=($metrics)
     b_metrics="\${b_metrics[@]//*afd_metric*}"
-    b_metrics+="afd_metric.nii.gz"
+    b_metrics+=" afd_metric.nii.gz"
 
     scil_project_streamlines_to_map.py \$bundle \${bname} --in_metrics \${b_metrics} 
     cd \${bname}
@@ -581,7 +581,7 @@ process Bundle_Mean_Std {
         mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
         b_metrics=($metrics)
         b_metrics="\${b_metrics[@]//*afd_metric*}"
-        b_metrics+="afd_metric.nii.gz"
+        b_metrics+=" afd_metric.nii.gz"
 
         scil_compute_bundle_mean_std.py $density_weighting \$bname.trk \${b_metrics} >\
             \${bname}.json
@@ -716,7 +716,7 @@ process Bundle_Mean_Std_Per_Point {
         mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
         b_metrics=($metrics)
         b_metrics="\${b_metrics[@]//*afd_metric*}"
-        b_metrics+="afd_metric.nii.gz"
+        b_metrics+=" afd_metric.nii.gz"
 
         scil_compute_bundle_mean_std_per_point.py \$bname.trk \$label_map \
             \${b_metrics} --sort_keys $density_weighting > \$bname.json

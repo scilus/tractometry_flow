@@ -257,9 +257,7 @@ process Bundle_Label_And_Distance_Maps {
 
         centroid=${sid}__\${bname}_centroid_${params.nb_points}.trk
         if [[ -f \${centroid} ]]; then
-            scil_compute_bundle_voxel_label_map.py \$bundle \${centroid} tmp_out\
-                --min_streamline_count ${params.min_streamline_count} \
-                --min_voxel_count ${params.min_voxel_count} -f
+            scil_compute_bundle_voxel_label_map.py \$bundle \${centroid} tmp_out -f
 
             mv tmp_out/labels_map.nii.gz ${sid}__\${bname}_labels.nii.gz
             mv tmp_out/distance_map.nii.gz ${sid}__\${bname}_distances.nii.gz
@@ -445,7 +443,7 @@ process Bundle_Endpoints_Map {
 metrics_for_endpoints_roi_stats
     .mix(fixel_afd_for_endpoints_roi_stats)
     .groupTuple(by: 0)
-     .map{it -> [it[0], it[1..-1].flatten()]}
+    .map{it -> [it[0], it[1..-1].flatten()]}
     .set{metrics_afd_for_endpoints_roi_stats}
 
 metrics_afd_for_endpoints_roi_stats
@@ -479,10 +477,13 @@ process Bundle_Metrics_Stats_In_Endpoints {
         mv \$map \${bname}_head.nii.gz
         mv \${map/_head/_tail} \${bname}_tail.nii.gz
 
-        mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
         b_metrics=($metrics)
-        b_metrics="\${b_metrics[@]//*afd_metric*}"
-        b_metrics+=" afd_metric.nii.gz"
+        if [[ -f \${bname}_afd_metric.nii.gz ]];
+        then
+            mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
+            b_metrics="\${b_metrics[@]//*afd_metric*}"
+            b_metrics+=" afd_metric.nii.gz"
+        fi
 
         scil_compute_metrics_stats_in_ROI.py \${bname}_head.nii.gz $normalize_weights\
             --metrics \${b_metrics} > \${bname}_head.json
@@ -498,7 +499,7 @@ process Bundle_Metrics_Stats_In_Endpoints {
 metrics_for_endpoints_metrics
     .mix(fixel_afd_for_endpoints_metrics)
     .groupTuple(by: 0)
-    .map{it -> [it[0], it[1..-1].flatten()]}
+   .map{it -> [it[0], it[1..-1].flatten()]}
     .set{metrics_afd_for_endpoints_metrics}
 
 bundles_for_endpoints_metrics
@@ -530,10 +531,13 @@ process Bundle_Endpoints_Metrics {
     bname=\${bname/_uniformized/}
     mkdir \${bname}
 
-    mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
     b_metrics=($metrics)
-    b_metrics="\${b_metrics[@]//*afd_metric*}"
-    b_metrics+=" afd_metric.nii.gz"
+    if [[ -f \${bname}_afd_metric.nii.gz ]];
+    then
+        mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
+        b_metrics="\${b_metrics[@]//*afd_metric*}"
+        b_metrics+=" afd_metric.nii.gz"
+    fi
 
     scil_project_streamlines_to_map.py \$bundle \${bname} --in_metrics \${b_metrics} 
     cd \${bname}
@@ -548,7 +552,7 @@ process Bundle_Endpoints_Metrics {
 metrics_for_mean_std
     .mix(fixel_afd_for_mean_std)
     .groupTuple(by: 0)
-     .map{it -> [it[0], it[1..-1].flatten()]}
+    .map{it -> [it[0], it[1..-1].flatten()]}
     .set{metrics_afd_for_mean_std}
 
 metrics_afd_for_mean_std
@@ -578,10 +582,13 @@ process Bundle_Mean_Std {
         bname=\${bname/_uniformized/}
         mv \$bundle \$bname.trk
 
-        mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
         b_metrics=($metrics)
-        b_metrics="\${b_metrics[@]//*afd_metric*}"
-        b_metrics+=" afd_metric.nii.gz"
+        if [[ -f \${bname}_afd_metric.nii.gz ]];
+        then
+            mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
+            b_metrics="\${b_metrics[@]//*afd_metric*}"
+            b_metrics+=" afd_metric.nii.gz"
+        fi
 
         scil_compute_bundle_mean_std.py $density_weighting \$bname.trk \${b_metrics} >\
             \${bname}.json
@@ -675,7 +682,7 @@ process Bundle_Volume_Per_Label {
 metrics_for_mean_std_per_point
     .mix(fixel_afd_for_mean_std_per_point)
     .groupTuple(by: 0)
-     .map{it -> [it[0], it[1..-1].flatten()]}
+    .map{it -> [it[0], it[1..-1].flatten()]}
     .set{metrics_afd_for_std_per_point}
 
 metrics_afd_for_std_per_point
@@ -713,10 +720,13 @@ process Bundle_Mean_Std_Per_Point {
         label_map=${sid}__\${bname}_labels.nii.gz
         distance_map=${sid}__\${bname}_distances.nii.gz
 
-        mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
         b_metrics=($metrics)
-        b_metrics="\${b_metrics[@]//*afd_metric*}"
-        b_metrics+=" afd_metric.nii.gz"
+        if [[ -f \${bname}_afd_metric.nii.gz ]];
+        then
+            mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
+            b_metrics="\${b_metrics[@]//*afd_metric*}"
+            b_metrics+=" afd_metric.nii.gz"
+        fi
 
         scil_compute_bundle_mean_std_per_point.py \$bname.trk \$label_map \
             \${b_metrics} --sort_keys $density_weighting > \$bname.json

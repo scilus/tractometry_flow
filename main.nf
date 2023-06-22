@@ -539,7 +539,7 @@ process Bundle_Endpoints_Metrics {
         b_metrics+=" afd_metric.nii.gz"
     fi
 
-    scil_project_streamlines_to_map.py \$bundle \${bname} --in_metrics \${b_metrics} 
+    scil_project_streamlines_to_map.py \$bundle \${bname} --in_metrics \${b_metrics} --from_wm
     cd \${bname}
     for i in *.nii.gz;
         do mv "\$i" "${sid}__\$i";

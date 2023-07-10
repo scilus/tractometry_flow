@@ -82,7 +82,7 @@ if (params.use_provided_centroids){
 number_centroids_for_compare
     .concat(number_bundles_for_compare)
     .toList()
-    .subscribe{a, b -> if (a == 0)
+    .subscribe{a, b -> if (a < b)
     error "Error ~ You ask the pipeline to use provided centroids but there are less centroids than bundles.\nPlease provide at least a centroid per bundle."}
 }
 

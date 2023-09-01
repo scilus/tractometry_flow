@@ -49,7 +49,7 @@ workflow.onComplete {
 Channel
     .fromFilePairs("$params.input/**/bundles/*.trk",
                    size: -1) { it.parent.parent.name }
-    .into{bundles_for_rm_invalid; in_bundles_check; bundles_for_fixel_afd}
+    .into{bundles_for_rm_invalid; in_bundles_check}
 
 Channel
     .fromFilePairs("$params.input/**/metrics/*.nii.gz",
@@ -137,7 +137,7 @@ process Remove_Invalid_Streamlines {
     set sid, file(bundles) from bundles_for_rm_invalid
 
     output:
-    set sid, "${sid}__*_ic.trk" into bundles_for_label_and_distance_map, bundles_for_centroids
+    set sid, "${sid}__*_ic.trk" into bundles_for_label_and_distance_map, bundles_for_centroids, bundles_for_fixel_afd
 
     script:
     String bundles_list = bundles.join(", ").replace(',', '')

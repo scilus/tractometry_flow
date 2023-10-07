@@ -3,6 +3,9 @@ Tractometry pipeline
 
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/scilus/tractometry_flow)](https://github.com/scilus/tractometry_flow/releases)
 
+[![Nextflow](https://img.shields.io/badge/nextflow-21.10.6-brightgreen.svg)](https://www.nextflow.io/)
+[![Docker container badge](https://img.shields.io/docker/v/scilus/scilus?label=docker&logo=docker&logoColor=white)](https://hub.docker.com/r/scilus/scilus)
+
 This pipeline allows you to extract tractometry information by combining
 subjects's fiber bundles and diffusion MRI metrics.
 
@@ -30,15 +33,14 @@ Requirements
 Singularity/Docker
 -----------
 If you are on Linux, we recommend using the Singularity to run tractometry_flow pipeline.
-If you have Singularity == 3.*, launch your Nextflow command with:
-`-with-singularity scilus/scilus:1.2.0_tractometryflow-1.0.0`
+If you have Apptainer (Singularity), launch your Nextflow command with:
+`-with-singularity ABSOLUTE_PATH/scilus-1.6.0.sif`
 
-If you have rebuild singularity Singularity == 2.* image is available [here](http://scil.dinf.usherbrooke.ca/en/containers_list/scilus-1.2.0_tractometryflow-1.0.0.img)
-Launch your Nextflow command with: `-with-singularity ABSOLUTE_PATH/scilus-1.2.0_tractometryflow-1.0.0.img`
+Image is available [here](http://scil.dinf.usherbrooke.ca/en/containers_list/scilus-1.6.0.sif)
 
 If you are on MacOS or Windows, we recommend using the Docker container to run tractometry_flow pipeline.
 Launch your Nextflow command with:
-`-with-docker scilus/scilus:1.2.0_tractometryflow-1.0.0`
+`-with-docker scilus/scilus:1.6.0`
 
 Usage
 -----

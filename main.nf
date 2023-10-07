@@ -102,6 +102,32 @@ process Rename_Metrics {
     done
     """
 }
+
+process Remove_Invalid_Streamlines {
+    input:
+    set sid, file(bundles) from bundles_for_rm_invalid
+
+    output:
+    set sid, "${sid}__*_ic.trk" into bundles_for_label_and_distance_map, bundles_for_centroids, bundles_for_fixel_afd
+
+    script:
+    String bundles_list = bundles.join(", ").replace(',', '')
+    """
+    for bundle in $bundles_list;
+      do if [[ \$bundle == *"__"* ]]; then
+          pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
+          bname=\${bundle:\$pos}
+          bname=\$(basename \$bname .trk)
+      else
+          bname=\$(basename \$bundle .trk)
+      fi
+      bname=\${bname/$params.bundle_suffix_to_remove/}
+
+      scil_remove_invalid_streamlines.py \$bundle ${sid}__\${bname}_ic.trk --remove_single_point --remove_overlapping_points --cut_invalid --no_empty
+    done
+    """
+}
+
 bundles_for_fixel_afd
     .join(fodf_for_fixel_afd)
     .set{bundle_fodf_for_fixel_afd}
@@ -128,31 +154,6 @@ process Fixel_AFD {
         fi
         bname=\${bname/$params.bundle_suffix_to_remove/}
         scil_compute_mean_fixel_afd_from_bundles.py \$bundle $fodf \${bname}_afd_metric.nii.gz
-    done
-    """
-}
-
-process Remove_Invalid_Streamlines {
-    input:
-    set sid, file(bundles) from bundles_for_rm_invalid
-
-    output:
-    set sid, "${sid}__*_ic.trk" into bundles_for_label_and_distance_map, bundles_for_centroids, bundles_for_fixel_afd
-
-    script:
-    String bundles_list = bundles.join(", ").replace(',', '')
-    """
-    for bundle in $bundles_list;
-      do if [[ \$bundle == *"__"* ]]; then
-          pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
-          bname=\${bundle:\$pos}
-          bname=\$(basename \$bname .trk)
-      else
-          bname=\$(basename \$bundle .trk)
-      fi
-      bname=\${bname/$params.bundle_suffix_to_remove/}
-
-      scil_remove_invalid_streamlines.py \$bundle ${sid}__\${bname}_ic.trk --remove_single_point --remove_overlapping_points --cut_invalid --no_empty
     done
     """
 }

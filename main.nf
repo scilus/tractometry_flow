@@ -478,7 +478,7 @@ process Bundle_Metrics_Stats_In_Endpoints {
         mv \$map \${bname}_head.nii.gz
         mv \${map/_head/_tail} \${bname}_tail.nii.gz
 
-        b_metrics=($metrics)
+        b_metrics="$metrics"
         if [[ -f \${bname}_afd_metric.nii.gz ]];
         then
             mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
@@ -532,7 +532,7 @@ process Bundle_Endpoints_Metrics {
     bname=\${bname/_uniformized/}
     mkdir \${bname}
 
-    b_metrics=($metrics)
+    b_metrics="$metrics"
     if [[ -f \${bname}_afd_metric.nii.gz ]];
     then
         mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
@@ -583,7 +583,7 @@ process Bundle_Mean_Std {
         bname=\${bname/_uniformized/}
         mv \$bundle \$bname.trk
 
-        b_metrics=($metrics)
+        b_metrics="$metrics"
         if [[ -f \${bname}_afd_metric.nii.gz ]];
         then
             mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
@@ -721,7 +721,7 @@ process Bundle_Mean_Std_Per_Point {
         label_map=${sid}__\${bname}_labels.nii.gz
         distance_map=${sid}__\${bname}_distances.nii.gz
 
-        b_metrics=($metrics)
+        b_metrics="$metrics"
         if [[ -f \${bname}_afd_metric.nii.gz ]];
         then
             mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz

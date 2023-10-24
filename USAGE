@@ -54,7 +54,7 @@ DESCRIPTION
 
                             All subjects in the [root] folder must contain
                             pre-computed centroids if pre-computed centroids
-                            are provided. In other words, you can't mix
+                            are provided. In other words, you can not mix
                             subjects with and without pre-computed centroids
 
 
@@ -78,13 +78,22 @@ OPTIONAL ARGUMENTS (current value)
 --output_dir                                Directory where to write the final results.
                                             By default, will be in "./results_tractometry"
 
+
+AVAILABLE PROFILES (using -profile option (e.g. -profile macos, cbrain))
+macos                                    When this profile is used, rbx_flow will modify a parameter (scratch) for MacOS users.
+
+cbrain                                   When this profile is used, Nextflow will copy all the output files in publishDir and not use symlinks.
+
+
 NOTES
 
-The `scilpy/scripts` folder should be in your PATH environment variable
+The 'scilpy/scripts' folder should be in your PATH environment variable. Not necessary if the
+Singularity container is used.
 
-The intermediate working directory is, by default, set to "./work".
+The intermediate working directory is, by default, set to './work'.
 To change it, use the '-w WORK_DIR' argument.
 
-Use `-C config_file.config` to specify a non-default configuration file.
-
-If running this on OSX, use `-profile osx` to get the correct shell.
+The default config file is tractoflow/nextflow.config.
+Use '-C config_file.config' to specify a non-default configuration file.
+The '-C config_file.config' must be inserted after the nextflow call
+like 'nextflow -C config_file.config run ...'.

@@ -546,8 +546,14 @@ process Bundle_Endpoints_Metrics {
     for i in *.nii.gz;
         do mv "\$i" "${sid}__\$i";
     done
-    rename s/${sid}__${sid}__/${sid}__/ *
 
+    for i in *;
+        do
+        if [[ \$i == "${sid}__${sid}__"* ]];
+        then
+            mv - \$i "\${i/${sid}__${sid}__/${sid}__/}";
+        fi
+    done
     """
 }
 

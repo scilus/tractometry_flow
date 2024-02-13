@@ -480,9 +480,9 @@ process Bundle_Metrics_Stats_In_Endpoints {
 
         b_metrics="$metrics"
         b_metrics=\$(echo \$b_metrics | tr ' ' '\n' | grep -v "_afd_metric" | tr '\n' ' ')
-        if [[ -f \${bname}_afd_metric.nii.gz ]];
+        if [[ -f \${bname}_ic_afd_metric.nii.gz ]];
         then
-            mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
+            mv \${bname}_ic_afd_metric.nii.gz afd_metric.nii.gz
             b_metrics+=" afd_metric.nii.gz"
         fi
 
@@ -535,9 +535,9 @@ process Bundle_Endpoints_Metrics {
 
     b_metrics="$metrics"
     b_metrics=\$(echo \$b_metrics | tr ' ' '\n' | grep -v "_afd_metric" | tr '\n' ' ')
-    if [[ -f \${bname}_afd_metric.nii.gz ]];
+    if [[ -f \${bname}_ic_afd_metric.nii.gz ]];
     then
-        mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
+        mv \${bname}_ic_afd_metric.nii.gz afd_metric.nii.gz
         b_metrics+=" afd_metric.nii.gz"
     fi
 
@@ -593,9 +593,9 @@ process Bundle_Mean_Std {
 
         b_metrics="$metrics"
         b_metrics=\$(echo \$b_metrics | tr ' ' '\n' | grep -v "_afd_metric" | tr '\n' ' ')
-        if [[ -f \${bname}_afd_metric.nii.gz ]];
+        if [[ -f \${bname}_ic_afd_metric.nii.gz ]];
         then
-            mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
+            mv \${bname}_ic_afd_metric.nii.gz afd_metric.nii.gz
             b_metrics+=" afd_metric.nii.gz"
         fi
 
@@ -732,9 +732,9 @@ process Bundle_Mean_Std_Per_Point {
 
         b_metrics="$metrics"
         b_metrics=\$(echo \$b_metrics | tr ' ' '\n' | grep -v "_afd_metric" | tr '\n' ' ')
-        if [[ -f \${bname}_afd_metric.nii.gz ]];
+        if [[ -f \${bname}_ic_afd_metric.nii.gz ]];
         then
-            mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
+            mv \${bname}_ic_afd_metric.nii.gz afd_metric.nii.gz
             b_metrics+=" afd_metric.nii.gz"
         fi
 

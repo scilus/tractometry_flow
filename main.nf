@@ -479,10 +479,10 @@ process Bundle_Metrics_Stats_In_Endpoints {
         mv \${map/_head/_tail} \${bname}_tail.nii.gz
 
         b_metrics="$metrics"
-        if [[ -f \${bname}_afd_metric.nii.gz ]];
+        b_metrics=\$(echo \$b_metrics | tr ' ' '\n' | grep -v "_afd_metric" | tr '\n' ' ')
+        if [[ -f \${bname}_ic_afd_metric.nii.gz ]];
         then
-            mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
-            b_metrics="\${b_metrics[@]//*afd_metric*}"
+            mv \${bname}_ic_afd_metric.nii.gz afd_metric.nii.gz
             b_metrics+=" afd_metric.nii.gz"
         fi
 
@@ -530,13 +530,14 @@ process Bundle_Endpoints_Metrics {
         bname=\$(basename \$bundle .trk)
     fi
     bname=\${bname/_uniformized/}
+    bname=\${bname/_ic/}
     mkdir \${bname}
 
     b_metrics="$metrics"
-    if [[ -f \${bname}_afd_metric.nii.gz ]];
+    b_metrics=\$(echo \$b_metrics | tr ' ' '\n' | grep -v "_afd_metric" | tr '\n' ' ')
+    if [[ -f \${bname}_ic_afd_metric.nii.gz ]];
     then
-        mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
-        b_metrics="\${b_metrics[@]//*afd_metric*}"
+        mv \${bname}_ic_afd_metric.nii.gz afd_metric.nii.gz
         b_metrics+=" afd_metric.nii.gz"
     fi
 
@@ -545,8 +546,14 @@ process Bundle_Endpoints_Metrics {
     for i in *.nii.gz;
         do mv "\$i" "${sid}__\$i";
     done
-    rename s/${sid}__${sid}__/${sid}__/ *
 
+    for i in *;
+        do
+        if [[ \$i == "${sid}__${sid}__"* ]];
+        then
+            mv - \$i "\${i/${sid}__${sid}__/${sid}__/}";
+        fi
+    done
     """
 }
 
@@ -581,13 +588,14 @@ process Bundle_Mean_Std {
             bname=\$(basename \$bundle .trk)
         fi
         bname=\${bname/_uniformized/}
+        bname=\${bname/_ic/}
         mv \$bundle \$bname.trk
 
         b_metrics="$metrics"
-        if [[ -f \${bname}_afd_metric.nii.gz ]];
+        b_metrics=\$(echo \$b_metrics | tr ' ' '\n' | grep -v "_afd_metric" | tr '\n' ' ')
+        if [[ -f \${bname}_ic_afd_metric.nii.gz ]];
         then
-            mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
-            b_metrics="\${b_metrics[@]//*afd_metric*}"
+            mv \${bname}_ic_afd_metric.nii.gz afd_metric.nii.gz
             b_metrics+=" afd_metric.nii.gz"
         fi
 
@@ -717,15 +725,16 @@ process Bundle_Mean_Std_Per_Point {
             bname=\$(basename \$bundle .trk)
         fi
         bname=\${bname/_uniformized/}
+        bname=\${bname/_ic/} 
         mv \$bundle \$bname.trk
         label_map=${sid}__\${bname}_labels.nii.gz
         distance_map=${sid}__\${bname}_distances.nii.gz
 
         b_metrics="$metrics"
-        if [[ -f \${bname}_afd_metric.nii.gz ]];
+        b_metrics=\$(echo \$b_metrics | tr ' ' '\n' | grep -v "_afd_metric" | tr '\n' ' ')
+        if [[ -f \${bname}_ic_afd_metric.nii.gz ]];
         then
-            mv \${bname}_afd_metric.nii.gz afd_metric.nii.gz
-            b_metrics="\${b_metrics[@]//*afd_metric*}"
+            mv \${bname}_ic_afd_metric.nii.gz afd_metric.nii.gz
             b_metrics+=" afd_metric.nii.gz"
         fi
 

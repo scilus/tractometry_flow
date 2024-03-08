@@ -15,7 +15,10 @@ DESCRIPTION
                             ├── S1
                             │   ├── *lesion_mask.nii.gz (optional)
                             │   ├── *fodf.nii.gz (optional to generate fixel AFD)
+                            │   ├── *pdds.nii.gz (optional to generate fixel FA,MD,RD,AD)
                             │   ├── metrics
+                            │   │   └── *.nii.gz
+                            │   ├── fixel_metrics
                             │   │   └── *.nii.gz
                             │   └── bundles
                             │       └── *.trk
@@ -23,6 +26,8 @@ DESCRIPTION
                                 ├── *lesion_mask.nii.gz (optional)
                                 ├── *fodf.nii.gz (optional to generate fixel AFD)
                                 ├── metrics
+                                │   └── *.nii.gz
+                                ├── fixel_metrics
                                 │   └── *.nii.gz
                                 └── bundles
                                     └── *.trk
@@ -37,12 +42,16 @@ DESCRIPTION
                             ├── S1
                             │   ├── metrics
                             │   │   └── *.nii.gz
+                            │   ├── fixel_metrics
+                            │   │   └── *.nii.gz
                             │   ├── centroids
                             │   │   └── [Bundle_Name]_centroid.trk
                             │   └── bundles
                             │       └── [Bundle_Name].trk
                             └── S2
                                 ├── metrics
+                                │   └── *.nii.gz
+                                ├── fixel_metrics
                                 │   └── *.nii.gz
                                 ├── centroids
                                 │   └── [Bundle_Name]_centroid.trk
@@ -72,6 +81,7 @@ OPTIONAL ARGUMENTS (current value)
 --mean_std_per_point_density_weighting      Weight the mean/std per point by the local tract density ($mean_std_per_point_density_weighting)
 --endpoints_metric_stats_normalize_weights  Normalize the weights to the [0, 1] range ($endpoints_metric_stats_normalize_weights)
 --skip_projection_endpoints_metrics         Skip the (slow) process that projects metrics onto the endpoints of streamlines  ($skip_projection_endpoints_metrics)
+--compute_fixel_mrds_metrics                Compute fixel-based multi-tensor MRDS metrics along the bundles ($compute_fixel_mrds_metrics)
 
 --processes                                 The number of parallel processes to launch ($cpu_count).
                                             Only affects the local scheduler.

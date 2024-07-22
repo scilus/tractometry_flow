@@ -79,7 +79,7 @@ in_metrics
 in_bundles_check.map{it[1]}.flatten().count().set{number_bundles_for_compare}
 in_centroids_check.map{it[1]}.flatten().count().set{number_centroids_for_compare}
 
-if (params.use_provided_centroids){
+if (params.use_provided_centroids && !params.skip_tract_profiles){
 number_centroids_for_compare
     .concat(number_bundles_for_compare)
     .toList()

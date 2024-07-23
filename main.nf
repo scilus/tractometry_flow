@@ -19,6 +19,7 @@ if(params.help) {
                 "mean_std_per_point_density_weighting":"$params.mean_std_per_point_density_weighting",
                 "endpoints_metric_stats_normalize_weights":"$params.endpoints_metric_stats_normalize_weights",
                 "skip_projection_endpoints_metrics":"$params.skip_projection_endpoints_metrics",
+                "skip_tract_profiles": "$params.skip_tract_profiles",
                 "cpu_count":"$cpu_count",
                 "bundle_suffix_to_remove":"$params.bundle_suffix_to_remove"
         ]
@@ -78,7 +79,7 @@ in_metrics
 in_bundles_check.map{it[1]}.flatten().count().set{number_bundles_for_compare}
 in_centroids_check.map{it[1]}.flatten().count().set{number_centroids_for_compare}
 
-if (params.use_provided_centroids){
+if (params.use_provided_centroids && !params.skip_tract_profiles){
 number_centroids_for_compare
     .concat(number_bundles_for_compare)
     .toList()
@@ -108,7 +109,7 @@ process Remove_Invalid_Streamlines {
     set sid, file(bundles) from bundles_for_rm_invalid
 
     output:
-    set sid, "${sid}__*_ic.trk" into bundles_for_label_and_distance_map, bundles_for_centroids, bundles_for_fixel_afd
+    set sid, "${sid}__*_ic.trk" into bundles_for_label_and_distance_map, bundles_for_centroids, bundles_for_fixel_afd, bundles_if_skip_tract_profiles
 
     script:
     String bundles_list = bundles.join(", ").replace(',', '')
@@ -167,6 +168,7 @@ process Bundle_Centroid {
 
     when:
     !params.use_provided_centroids
+    !params.skip_tract_profiles
 
     script:
     String bundles_list = bundles.join(", ").replace(',', '')
@@ -195,6 +197,7 @@ process Resample_Centroid {
 
     when:
     params.use_provided_centroids
+    !params.skip_tract_profiles
 
     script:
     String bundles_list = bundles.join(", ").replace(',', '')
@@ -238,7 +241,7 @@ process Bundle_Label_And_Distance_Maps {
     output:
     set sid, "${sid}__*_labels.nii.gz", "${sid}__*_distances.nii.gz" into\
         label_distance_maps_for_mean_std_per_point
-    set sid, "${sid}__*_labels.trk" into bundles_for_uniformize
+    set sid, "${sid}__*_labels.trk" into bundles_labels_for_uniformize
     file "${sid}__*_distances.trk"
     set sid, "${sid}__*_labels.nii.gz" into voxel_label_maps_for_volume,
                                             voxel_label_map_for_lesion_load
@@ -266,9 +269,17 @@ process Bundle_Label_And_Distance_Maps {
             mv tmp_out/labels.trk ${sid}__\${bname}_labels.trk
             mv tmp_out/distance.trk ${sid}__\${bname}_distances.trk
         fi
-
     done
     """
+}
+
+if (params.skip_tract_profiles) {
+    bundles_if_skip_tract_profiles
+        .set{bundles_for_uniformize}
+}
+else {
+    bundles_labels_for_uniformize
+        .set{bundles_for_uniformize}
 }
 
 process Uniformize_Bundle {
@@ -290,11 +301,21 @@ process Uniformize_Bundle {
         # Uniformize the bundle orientation as well as simplifying
         # filename convention
         if [[ \$bundle == *"__"* ]]; then
-            scil_uniformize_streamlines_endpoints.py \$bundle \
-                \${bundle/_labels.trk/_uniformized.trk} --auto -f
+            if [[ \$bundle == *"labels"* ]]; then
+                scil_uniformize_streamlines_endpoints.py \$bundle \
+                    \${bundle/_labels.trk/_uniformized.trk} --auto -f
+            elif [[ \$bundle == *"ic"* ]]; then
+                scil_uniformize_streamlines_endpoints.py \$bundle \
+                    \${bundle/_ic.trk/_uniformized.trk} --auto -f
+            fi
         else
-            scil_uniformize_streamlines_endpoints.py \$bundle \
-                ${sid}__\${bundle/_labels.trk/_uniformized.trk} --auto -f
+            if [[ \$bundle == *"labels"* ]]; then
+                scil_uniformize_streamlines_endpoints.py \$bundle \
+                    ${sid}__\${bundle/_labels.trk/_uniformized.trk} --auto -f
+            elif [[ \$bundle == *"ic"* ]]; then
+                scil_uniformize_streamlines_endpoints.py \$bundle \
+                    ${sid}__\${bundle/_ic.trk/_uniformized.trk} --auto -f
+            fi
         fi
     done
     """
@@ -659,7 +680,6 @@ process Bundle_Streamline_Count {
     """
 }
 
-
 process Bundle_Volume_Per_Label {
     input:
     set sid, file(voxel_label_maps) from voxel_label_maps_for_volume
@@ -745,8 +765,6 @@ process Bundle_Mean_Std_Per_Point {
             --add_parent_key ${sid}
     """
 }
-
-mean_std_per_point_for_plot
 
 process Plot_Mean_Std_Per_Point {
     input:

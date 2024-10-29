@@ -649,34 +649,7 @@ process Bundle_Volume {
         mv \$bundle \$bname.trk
         scil_bundle_shape_measures.py \$bname.trk --out_json \${bname}.json
     done
-    scil_json_merge_entries.py *.json ${sid}__volume.json --no_list --add_parent_key ${sid}
-    """
-}
-
-process Bundle_Streamline_Count {
-    input:
-    set sid, file(bundles) from bundles_for_streamline_count
-
-    output:
-    file "${sid}__streamline_count.json" into streamline_counts_to_aggregate
-
-    script:
-    String bundles_list = bundles.join(", ").replace(',', '')
-    """
-    for bundle in $bundles_list;
-        do if [[ \$bundle == *"__"* ]]; then
-            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
-            bname=\${bundle:\$pos}
-            bname=\$(basename \$bname .trk)
-        else
-            bname=\$(basename \$bundle .trk)
-        fi
-        bname=\${bname/_uniformized/}
-        mv \$bundle \$bname.trk
-        scil_tractogram_count_streamlines.py \$bname.trk > \${bname}.json
-    done
-    scil_json_merge_entries.py *.json ${sid}__streamline_count.json --no_list \
-        --add_parent_key ${sid}
+    scil_json_merge_entries.py *.json ${sid}__volume.json --no_list --add_parent_key ${sid} --keep_separate
     """
 }
 
@@ -964,29 +937,6 @@ process Aggregate_All_Volume {
     scil_json_merge_entries.py $jsons volumes.json --no_list
     scil_json_harmonize_entries.py volumes.json volumes.json -f -v --sort_keys
     scil_json_convert_entries_to_xlsx.py volumes.json volumes.xlsx
-    """
-}
-
-streamline_counts_to_aggregate
-    .collect()
-    .set{all_streamline_counts_to_aggregate}
-
-process Aggregate_All_Streamline_Count {
-    tag = { "Statistics" }
-    publishDir = params.statsPublishDir
-
-    input:
-    file jsons from all_streamline_counts_to_aggregate
-
-    output:
-    file "streamline_count.json"
-    file "streamline_count.xlsx"
-
-    script:
-    """
-    scil_json_merge_entries.py $jsons streamline_count.json --no_list
-    scil_json_harmonize_entries.py streamline_count.json streamline_count.json -f -v --sort_keys
-    scil_json_convert_entries_to_xlsx.py streamline_count.json streamline_count.xlsx
     """
 }
 

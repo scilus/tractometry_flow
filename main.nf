@@ -731,7 +731,7 @@ process Bundle_Mean_Std_Per_Point {
             b_metrics+=" afd_metric.nii.gz"
         fi
 
-        scil_bundle_mean_std.py \$bname.trk \$label_map \
+        scil_bundle_mean_std.py \$bname.trk --per_point \$label_map \
             \${b_metrics} --sort_keys $density_weighting > \$bname.json
         done
         scil_json_merge_entries.py *.json ${sid}__mean_std_per_point.json --no_list \

@@ -345,6 +345,7 @@ process Lesion_Load {
     mkdir streamlines_stats/
     mkdir lesion_load/
     mkdir lesion_load_per_point/
+    scil_labels_from_mask.py $lesion lesion_labels.nii.gz
     for bundle in $bundles_list;
         do if [[ \$bundle == *"__"* ]]; then
             pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
@@ -358,12 +359,12 @@ process Lesion_Load {
         mv ${sid}__\${bname}_labels.nii.gz \$bname.nii.gz
         mv \$bundle \$bname.trk
 
-        scil_lesions_info.py $lesion lesion_load_per_point/\$bname.json \
+        scil_lesions_info.py lesion_labels.nii.gz lesion_load_per_point/\$bname.json \
             --bundle_labels_map \$bname.nii.gz \
             --out_lesion_atlas "${sid}__\${bname}_lesion_map.nii.gz" \
             --min_lesion_vol $params.min_lesion_vol
 
-        scil_lesions_info.py $lesion lesion_load/\$bname.json \
+        scil_lesions_info.py lesion_labels.nii.gz lesion_load/\$bname.json \
             --bundle \$bname.trk --out_lesion_stats ${sid}__lesion_stats.json \
             --out_streamlines_stats streamlines_stats/\$bname.json \
             --min_lesion_vol $params.min_lesion_vol

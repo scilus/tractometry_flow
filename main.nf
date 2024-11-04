@@ -124,7 +124,7 @@ process Remove_Invalid_Streamlines {
       fi
       bname=\${bname/$params.bundle_suffix_to_remove/}
 
-      scil_remove_invalid_streamlines.py \$bundle ${sid}__\${bname}_ic.trk --remove_single_point --remove_overlapping_points --cut_invalid --no_empty
+      scil_tractogram_remove_invalid.py \$bundle ${sid}__\${bname}_ic.trk --remove_single_point --remove_overlapping_points --cut_invalid --no_empty
     done
     """
 }
@@ -154,7 +154,7 @@ process Fixel_AFD {
             bname=\$(basename \$bundle .trk)
         fi
         bname=\${bname/$params.bundle_suffix_to_remove/}
-        scil_compute_mean_fixel_afd_from_bundles.py \$bundle $fodf \${bname}_afd_metric.nii.gz
+        scil_bundle_mean_fixel_afd.py \$bundle $fodf \${bname}_afd_metric.nii.gz
     done
     """
 }
@@ -182,8 +182,8 @@ process Bundle_Centroid {
             bname=\$(basename \$bundle .trk)
         fi
         bname=\${bname/_ic/}
-        scil_compute_centroid.py \$bundle centroid.trk --nb_points $params.nb_points -f
-        scil_uniformize_streamlines_endpoints.py centroid.trk ${sid}__\${bname}_centroid_${params.nb_points}.trk --auto
+        scil_bundle_compute_centroid.py \$bundle centroid.trk --nb_points $params.nb_points -f
+        scil_bundle_uniformize_endpoints.py centroid.trk ${sid}__\${bname}_centroid_${params.nb_points}.trk --auto
     done
     """
 }
@@ -213,7 +213,7 @@ process Resample_Centroid {
         bname=\${bname/_centroid/}
         bname=\${bname/_ic/}
 
-        echo \$(scil_resample_streamlines.py \$bundle \
+        echo \$(scil_tractogram_resample_nb_points.py \$bundle \
             "${sid}__\${bname}_centroid_${params.nb_points}.trk" \
             --nb_pts_per_streamline $params.nb_points -f)
     done
@@ -261,7 +261,7 @@ process Bundle_Label_And_Distance_Maps {
 
         centroid=${sid}__\${bname}_centroid_${params.nb_points}.trk
         if [[ -f \${centroid} ]]; then
-            scil_compute_bundle_voxel_label_map.py \$bundle \${centroid} tmp_out -f
+            scil_bundle_label_map.py \$bundle \${centroid} tmp_out -f
 
             mv tmp_out/labels_map.nii.gz ${sid}__\${bname}_labels.nii.gz
             mv tmp_out/distance_map.nii.gz ${sid}__\${bname}_distances.nii.gz
@@ -302,18 +302,18 @@ process Uniformize_Bundle {
         # filename convention
         if [[ \$bundle == *"__"* ]]; then
             if [[ \$bundle == *"labels"* ]]; then
-                scil_uniformize_streamlines_endpoints.py \$bundle \
+                scil_bundle_uniformize_endpoints.py \$bundle \
                     \${bundle/_labels.trk/_uniformized.trk} --auto -f
             elif [[ \$bundle == *"ic"* ]]; then
-                scil_uniformize_streamlines_endpoints.py \$bundle \
+                scil_bundle_uniformize_endpoints.py \$bundle \
                     \${bundle/_ic.trk/_uniformized.trk} --auto -f
             fi
         else
             if [[ \$bundle == *"labels"* ]]; then
-                scil_uniformize_streamlines_endpoints.py \$bundle \
+                scil_bundle_uniformize_endpoints.py \$bundle \
                     ${sid}__\${bundle/_labels.trk/_uniformized.trk} --auto -f
             elif [[ \$bundle == *"ic"* ]]; then
-                scil_uniformize_streamlines_endpoints.py \$bundle \
+                scil_bundle_uniformize_endpoints.py \$bundle \
                     ${sid}__\${bundle/_ic.trk/_uniformized.trk} --auto -f
             fi
         fi
@@ -345,6 +345,7 @@ process Lesion_Load {
     mkdir streamlines_stats/
     mkdir lesion_load/
     mkdir lesion_load_per_point/
+    scil_labels_from_mask.py $lesion lesion_labels.nii.gz
     for bundle in $bundles_list;
         do if [[ \$bundle == *"__"* ]]; then
             pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
@@ -358,30 +359,30 @@ process Lesion_Load {
         mv ${sid}__\${bname}_labels.nii.gz \$bname.nii.gz
         mv \$bundle \$bname.trk
 
-        scil_analyse_lesions_load.py $lesion lesion_load_per_point/\$bname.json \
+        scil_lesions_info.py lesion_labels.nii.gz lesion_load_per_point/\$bname.json \
             --bundle_labels_map \$bname.nii.gz \
             --out_lesion_atlas "${sid}__\${bname}_lesion_map.nii.gz" \
             --min_lesion_vol $params.min_lesion_vol
 
-        scil_analyse_lesions_load.py $lesion lesion_load/\$bname.json \
+        scil_lesions_info.py lesion_labels.nii.gz lesion_load/\$bname.json \
             --bundle \$bname.trk --out_lesion_stats ${sid}__lesion_stats.json \
             --out_streamlines_stats streamlines_stats/\$bname.json \
             --min_lesion_vol $params.min_lesion_vol
     done
 
-    scil_merge_json.py ${sid}__lesion_stats.json ${sid}__lesion_stats.json \
+    scil_json_merge_entries.py ${sid}__lesion_stats.json ${sid}__lesion_stats.json \
         --remove_parent_key --add_parent_key ${sid} -f
 
     cd streamlines_stats
-    scil_merge_json.py *.json ../${sid}__lesion_streamlines_stats.json \
+    scil_json_merge_entries.py *.json ../${sid}__lesion_streamlines_stats.json \
         --add_parent_key ${sid}
 
     cd ../lesion_load
-    scil_merge_json.py *.json ../${sid}__lesion_load.json \
+    scil_json_merge_entries.py *.json ../${sid}__lesion_load.json \
         --add_parent_key ${sid}
 
     cd ../lesion_load_per_point
-    scil_merge_json.py *.json ../${sid}__lesion_load_per_point.json \
+    scil_json_merge_entries.py *.json ../${sid}__lesion_load_per_point.json \
         --add_parent_key ${sid}
     """
 }
@@ -398,7 +399,7 @@ process Color_Bundle {
     String bundles_list = bundles.join(", ").replace(',', '')
     """
     echo '$json_str' >> colors.json
-    scil_assign_uniform_color_to_tractograms.py $bundles_list --dict_colors colors.json
+    scil_tractogram_assign_uniform_color.py $bundles_list --dict_colors colors.json --out_suffix colored
     """
 }
 
@@ -421,10 +422,10 @@ process Bundle_Length_Stats {
             bname=\$(basename \$bundle .trk)
         fi
         bname=\${bname/_uniformized/}
-        scil_compute_streamlines_length_stats.py \$bundle > \$bname.json
+        scil_tractogram_print_info.py \$bundle > \$bname.json
         done
 
-        scil_merge_json.py *.json ${sid}__length_stats.json --add_parent_key ${sid} \
+        scil_json_merge_entries.py *.json ${sid}__length_stats.json --add_parent_key ${sid} \
             --keep_separate
     """
 }
@@ -452,12 +453,12 @@ process Bundle_Endpoints_Map {
         bname=\${bname/_uniformized/}
         mv \$bundle \$bname.trk
 
-        scil_compute_endpoints_map.py \$bname.trk \
+        scil_bundle_compute_endpoints_map.py \$bname.trk \
             ${sid}__\${bname}_endpoints_map_head.nii.gz \
             ${sid}__\${bname}_endpoints_map_tail.nii.gz >\
             ${sid}__\${bname}_endpoints_map_raw.json
     done
-    scil_merge_json.py *_endpoints_map_raw.json ${sid}__endpoints_map_raw.json \
+    scil_json_merge_entries.py *_endpoints_map_raw.json ${sid}__endpoints_map_raw.json \
         --no_list --add_parent_key ${sid}
     """
 }
@@ -507,13 +508,13 @@ process Bundle_Metrics_Stats_In_Endpoints {
             b_metrics+=" afd_metric.nii.gz"
         fi
 
-        scil_compute_metrics_stats_in_ROI.py \${bname}_head.nii.gz $normalize_weights\
+        scil_volume_stats_in_ROI.py \${bname}_head.nii.gz $normalize_weights\
             --metrics \${b_metrics} > \${bname}_head.json
-        scil_compute_metrics_stats_in_ROI.py \${bname}_tail.nii.gz $normalize_weights\
+        scil_volume_stats_in_ROI.py \${bname}_tail.nii.gz $normalize_weights\
             --metrics \${b_metrics} > \${bname}_tail.json
     done
 
-    scil_merge_json.py *_tail.json *_head.json ${sid}__endpoints_metric_stats.json \
+    scil_json_merge_entries.py *_tail.json *_head.json ${sid}__endpoints_metric_stats.json \
         --no_list --add_parent_key ${sid}
     """
 }
@@ -562,7 +563,7 @@ process Bundle_Endpoints_Metrics {
         b_metrics+=" afd_metric.nii.gz"
     fi
 
-    scil_project_streamlines_to_map.py \$bundle \${bname} --in_metrics \${b_metrics} --from_wm
+    scil_tractogram_project_streamlines_to_map.py \$bundle \${bname} --in_metrics \${b_metrics} --from_wm
     cd \${bname}
     for i in *.nii.gz;
         do mv "\$i" "${sid}__\$i";
@@ -620,10 +621,10 @@ process Bundle_Mean_Std {
             b_metrics+=" afd_metric.nii.gz"
         fi
 
-        scil_compute_bundle_mean_std.py $density_weighting \$bname.trk \${b_metrics} >\
+        scil_bundle_mean_std.py $density_weighting \$bname.trk \${b_metrics} >\
             \${bname}.json
     done
-    scil_merge_json.py *.json ${sid}__mean_std.json --no_list --add_parent_key ${sid}
+    scil_json_merge_entries.py *.json ${sid}__mean_std.json --no_list --add_parent_key ${sid}
     """
 }
 
@@ -647,36 +648,9 @@ process Bundle_Volume {
         fi
         bname=\${bname/_uniformized/}
         mv \$bundle \$bname.trk
-        scil_compute_bundle_volume.py \$bname.trk > \${bname}.json
+        scil_bundle_shape_measures.py \$bname.trk --out_json \${bname}.json
     done
-    scil_merge_json.py *.json ${sid}__volume.json --no_list --add_parent_key ${sid}
-    """
-}
-
-process Bundle_Streamline_Count {
-    input:
-    set sid, file(bundles) from bundles_for_streamline_count
-
-    output:
-    file "${sid}__streamline_count.json" into streamline_counts_to_aggregate
-
-    script:
-    String bundles_list = bundles.join(", ").replace(',', '')
-    """
-    for bundle in $bundles_list;
-        do if [[ \$bundle == *"__"* ]]; then
-            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
-            bname=\${bundle:\$pos}
-            bname=\$(basename \$bname .trk)
-        else
-            bname=\$(basename \$bundle .trk)
-        fi
-        bname=\${bname/_uniformized/}
-        mv \$bundle \$bname.trk
-        scil_count_streamlines.py \$bname.trk > \${bname}.json
-    done
-    scil_merge_json.py *.json ${sid}__streamline_count.json --no_list \
-        --add_parent_key ${sid}
+    scil_json_merge_entries.py *.json ${sid}__volume.json --no_list --add_parent_key ${sid} --keep_separate
     """
 }
 
@@ -700,10 +674,10 @@ process Bundle_Volume_Per_Label {
         fi
         bname=\${bname/_voxel_label_map/}
 
-        scil_compute_bundle_volume_per_label.py \$map \$bname --sort_keys >\
+        scil_bundle_volume_per_label.py \$map \$bname --sort_keys >\
             \${bname}.json
         done
-    scil_merge_json.py *.json ${sid}__volume_per_label.json --no_list \
+    scil_json_merge_entries.py *.json ${sid}__volume_per_label.json --no_list \
         --add_parent_key ${sid}
     """
 }
@@ -758,10 +732,10 @@ process Bundle_Mean_Std_Per_Point {
             b_metrics+=" afd_metric.nii.gz"
         fi
 
-        scil_compute_bundle_mean_std_per_point.py \$bname.trk \$label_map \
+        scil_bundle_mean_std.py \$bname.trk --per_point \$label_map \
             \${b_metrics} --sort_keys $density_weighting > \$bname.json
         done
-        scil_merge_json.py *.json ${sid}__mean_std_per_point.json --no_list \
+        scil_json_merge_entries.py *.json ${sid}__mean_std_per_point.json --no_list \
             --add_parent_key ${sid}
     """
 }
@@ -777,7 +751,7 @@ process Plot_Mean_Std_Per_Point {
     def json_str = JsonOutput.toJson(params.colors)
     """
     echo '$json_str' >> colors.json
-    scil_plot_mean_std_per_point.py $mean_std_per_point tmp_dir/ --dict_colors \
+    scil_plot_stats_per_point.py $mean_std_per_point tmp_dir/ --dict_colors \
         colors.json --nb_pts $params.nb_points
     mv tmp_dir/* ./
     """
@@ -794,8 +768,8 @@ process Plot_Lesions_Per_Point {
     def json_str = JsonOutput.toJson(params.colors)
     """
     echo '$json_str' >> colors.json
-    scil_merge_json.py $lesion_per_point tmp.json --recursive --average_last_layer
-    scil_plot_mean_std_per_point.py tmp.json tmp_dir/ --dict_colors \
+    scil_json_merge_entries.py $lesion_per_point tmp.json --recursive --average_last_layer
+    scil_plot_stats_per_point.py tmp.json tmp_dir/ --dict_colors \
         colors.json --nb_pts $params.nb_points
     mv tmp_dir/* ./
     """
@@ -817,9 +791,9 @@ process Aggregate_All_Lesion_Load {
 
     script:
     """
-    scil_merge_json.py $jsons lesion_load.json --average_last_layer --recursive
-    scil_harmonize_json.py lesion_load.json lesion_load.json -f -v --sort_keys
-    scil_convert_json_to_xlsx.py lesion_load.json lesion_load.xlsx
+    scil_json_merge_entries.py $jsons lesion_load.json --average_last_layer --recursive
+    scil_json_harmonize_entries.py lesion_load.json lesion_load.json -f -v --sort_keys
+    scil_json_convert_entries_to_xlsx.py lesion_load.json lesion_load.xlsx
     """
 }
 
@@ -842,12 +816,12 @@ process Aggregate_All_Lesion_Load_Per_Point {
     String json_list = jsons.join(", ").replace(',', '')
     """
     for json in $json_list
-        do scil_merge_json.py \$json \${json/.json/_avg.json} --remove_parent_key --recursive --average_last_layer
+        do scil_json_merge_entries.py \$json \${json/.json/_avg.json} --remove_parent_key --recursive --average_last_layer
     done
-    scil_merge_json.py *_avg.json lesion_load_per_point.json  \
+    scil_json_merge_entries.py *_avg.json lesion_load_per_point.json  \
         --recursive
-    scil_harmonize_json.py lesion_load_per_point.json lesion_load_per_point.json -f -v --sort_keys
-    scil_convert_json_to_xlsx.py lesion_load_per_point.json lesion_load_per_point.xlsx \
+    scil_json_harmonize_entries.py lesion_load_per_point.json lesion_load_per_point.json -f -v --sort_keys
+    scil_json_convert_entries_to_xlsx.py lesion_load_per_point.json lesion_load_per_point.xlsx \
         --stats_over_population
     """
 }
@@ -869,9 +843,9 @@ process Aggregate_All_Endpoints_Map {
 
     script:
     """
-    scil_merge_json.py $jsons endpoints_map.json --no_list
-    scil_harmonize_json.py endpoints_map.json endpoints_map.json -f -v --sort_keys
-    scil_convert_json_to_xlsx.py endpoints_map.json endpoints_map.xlsx
+    scil_json_merge_entries.py $jsons endpoints_map.json --no_list
+    scil_json_harmonize_entries.py endpoints_map.json endpoints_map.json -f -v --sort_keys
+    scil_json_convert_entries_to_xlsx.py endpoints_map.json endpoints_map.xlsx
     """
 }
 
@@ -892,9 +866,9 @@ process Aggregate_All_Endpoints_Metric_Stats {
 
     script:
     """
-    scil_merge_json.py $jsons endpoints_metric_stats.json --no_list
-    scil_harmonize_json.py endpoints_metric_stats.json endpoints_metric_stats.json -f -v --sort_keys
-    scil_convert_json_to_xlsx.py endpoints_metric_stats.json endpoints_metric_stats.xlsx
+    scil_json_merge_entries.py $jsons endpoints_metric_stats.json --no_list
+    scil_json_harmonize_entries.py endpoints_metric_stats.json endpoints_metric_stats.json -f -v --sort_keys
+    scil_json_convert_entries_to_xlsx.py endpoints_metric_stats.json endpoints_metric_stats.xlsx
     """
 }
 
@@ -915,9 +889,9 @@ process Aggregate_All_Bundle_Length_Stats {
 
     script:
     """
-    scil_merge_json.py $jsons length_stats.json --no_list
-    scil_harmonize_json.py length_stats.json length_stats.json -f -v --sort_keys
-    scil_convert_json_to_xlsx.py length_stats.json length_stats.xlsx
+    scil_json_merge_entries.py $jsons length_stats.json --no_list
+    scil_json_harmonize_entries.py length_stats.json length_stats.json -f -v --sort_keys
+    scil_json_convert_entries_to_xlsx.py length_stats.json length_stats.xlsx
     """
 }
 
@@ -938,9 +912,9 @@ process Aggregate_All_mean_std {
 
     script:
     """
-    scil_merge_json.py $jsons mean_std.json --no_list
-    scil_harmonize_json.py mean_std.json mean_std.json -f -v --sort_keys
-    scil_convert_json_to_xlsx.py mean_std.json mean_std.xlsx
+    scil_json_merge_entries.py $jsons mean_std.json --no_list
+    scil_json_harmonize_entries.py mean_std.json mean_std.json -f -v --sort_keys
+    scil_json_convert_entries_to_xlsx.py mean_std.json mean_std.xlsx
     """
 }
 
@@ -961,32 +935,9 @@ process Aggregate_All_Volume {
 
     script:
     """
-    scil_merge_json.py $jsons volumes.json --no_list
-    scil_harmonize_json.py volumes.json volumes.json -f -v --sort_keys
-    scil_convert_json_to_xlsx.py volumes.json volumes.xlsx
-    """
-}
-
-streamline_counts_to_aggregate
-    .collect()
-    .set{all_streamline_counts_to_aggregate}
-
-process Aggregate_All_Streamline_Count {
-    tag = { "Statistics" }
-    publishDir = params.statsPublishDir
-
-    input:
-    file jsons from all_streamline_counts_to_aggregate
-
-    output:
-    file "streamline_count.json"
-    file "streamline_count.xlsx"
-
-    script:
-    """
-    scil_merge_json.py $jsons streamline_count.json --no_list
-    scil_harmonize_json.py streamline_count.json streamline_count.json -f -v --sort_keys
-    scil_convert_json_to_xlsx.py streamline_count.json streamline_count.xlsx
+    scil_json_merge_entries.py $jsons volumes.json --no_list
+    scil_json_harmonize_entries.py volumes.json volumes.json -f -v --sort_keys
+    scil_json_convert_entries_to_xlsx.py volumes.json volumes.xlsx
     """
 }
 
@@ -1007,9 +958,9 @@ process Aggregate_All_Volume_Per_Label {
 
     script:
     """
-    scil_merge_json.py $jsons volume_per_label.json --no_list
-    scil_harmonize_json.py volume_per_label.json volume_per_label.json -f -v --sort_keys
-    scil_convert_json_to_xlsx.py volume_per_label.json volume_per_label.xlsx
+    scil_json_merge_entries.py $jsons volume_per_label.json --no_list
+    scil_json_harmonize_entries.py volume_per_label.json volume_per_label.json -f -v --sort_keys
+    scil_json_convert_entries_to_xlsx.py volume_per_label.json volume_per_label.xlsx
     """
 }
 
@@ -1032,12 +983,12 @@ process Aggregate_All_Mean_Std_Per_Point {
     String json_list = jsons.join(", ").replace(',', '')
     """
     for json in $json_list
-        do scil_merge_json.py \$json \${json/.json/_avg.json} --remove_parent_key --recursive
+        do scil_json_merge_entries.py \$json \${json/.json/_avg.json} --remove_parent_key --recursive
     done
-    scil_merge_json.py *_avg.json mean_std_per_point.json  \
+    scil_json_merge_entries.py *_avg.json mean_std_per_point.json  \
         --recursive
-    scil_harmonize_json.py mean_std_per_point.json mean_std_per_point.json -f -v --sort_keys
-    scil_convert_json_to_xlsx.py mean_std_per_point.json mean_std_per_point.xlsx \
+    scil_json_harmonize_entries.py mean_std_per_point.json mean_std_per_point.json -f -v --sort_keys
+    scil_json_convert_entries_to_xlsx.py mean_std_per_point.json mean_std_per_point.xlsx \
         --stats_over_population
     """
 }
@@ -1060,7 +1011,7 @@ process Plot_Population_Mean_Std_Per_Point {
     def json_str = JsonOutput.toJson(params.colors)
     """
     echo '$json_str' >> colors.json
-    scil_plot_mean_std_per_point.py $json_a tmp_dir/ --dict_colors colors.json \
+    scil_plot_stats_per_point.py $json_a tmp_dir/ --dict_colors colors.json \
         --stats_over_population --nb_pts $params.nb_points
     mv tmp_dir/* ./
     """

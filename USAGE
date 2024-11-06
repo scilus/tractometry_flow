@@ -13,18 +13,24 @@ DESCRIPTION
 
                             [root]
                             ├── S1
-                            │   ├── *lesion_mask.nii.gz (optional)
-                            │   ├── *fodf.nii.gz (optional to generate fixel AFD)
-                            │   ├── metrics
+                            │   ├── *lesion_mask.nii.gz (optional)
+                            │   ├── *fodf.nii.gz (optional to generate fixel AFD)
+                            │   ├── *pdds.nii.gz (optional to generate fixel FA,MD,RD,AD)
+                            │   ├── metrics
                             │   │   └── *.nii.gz
-                            │   └── bundles
+                            │   ├── fixel_metrics
+                            │   │   └── *.nii.gz
+                            │   └── bundles
                             │       └── *.trk
                             └── S2
-                                ├── *lesion_mask.nii.gz (optional)
+                                ├── *lesion_mask.nii.gz (optional)
                                 ├── *fodf.nii.gz (optional to generate fixel AFD)
-                                ├── metrics
+                                ├── *pdds.nii.gz (optional to generate fixel FA,MD,RD,AD)
+                                ├── metrics
                                 │   └── *.nii.gz
-                                └── bundles
+                                ├── fixel_metrics
+                                │   └── *.nii.gz
+                                └── bundles
                                     └── *.trk
 
                             Bundle centroid will be computed on-the-fly if no

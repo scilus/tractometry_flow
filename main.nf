@@ -72,6 +72,31 @@ Channel
         size: -1) { it.parent.name }
     .set{fodf_for_fixel_afd}
 
+Channel
+    .fromFilePairs("$params.input/**/*pdds.nii.gz",
+        size: -1) { it.parent.name }
+    .set{pdds_for_fixel_mrds}
+
+Channel
+    .fromFilePairs("$params.input/**/fixel_metrics/*fixel_fa.nii.gz",
+        size: -1) { it.parent.parent.name }
+    .set{fa_for_fixel_mrds}
+
+Channel
+    .fromFilePairs("$params.input/**/fixel_metrics/*fixel_md.nii.gz",
+        size: -1) { it.parent.parent.name }
+    .set{md_for_fixel_mrds}
+
+Channel
+    .fromFilePairs("$params.input/**/fixel_metrics/*fixel_rd.nii.gz",
+        size: -1) { it.parent.parent.name }
+    .set{rd_for_fixel_mrds}
+
+Channel
+    .fromFilePairs("$params.input/**/fixel_metrics/*fixel_ad.nii.gz",
+        size: -1) { it.parent.parent.name }
+    .set{ad_for_fixel_mrds}
+
 in_metrics
     .set{metrics_for_rename}
 
@@ -109,7 +134,7 @@ process Remove_Invalid_Streamlines {
     set sid, file(bundles) from bundles_for_rm_invalid
 
     output:
-    set sid, "${sid}__*_ic.trk" into bundles_for_label_and_distance_map, bundles_for_centroids, bundles_for_fixel_afd, bundles_if_skip_tract_profiles
+    set sid, "${sid}__*_ic.trk" into bundles_for_label_and_distance_map, bundles_for_centroids, bundles_for_fixel_afd, bundles_for_fixel_mrds, bundles_if_skip_tract_profiles
 
     script:
     String bundles_list = bundles.join(", ").replace(',', '')
@@ -155,6 +180,42 @@ process Fixel_AFD {
         fi
         bname=\${bname/$params.bundle_suffix_to_remove/}
         scil_bundle_mean_fixel_afd.py \$bundle $fodf \${bname}_afd_metric.nii.gz
+    done
+    """
+}
+
+bundles_for_fixel_mrds
+    .join(pdds_for_fixel_mrds)
+    .join(fa_for_fixel_mrds)
+    .join(md_for_fixel_mrds)
+    .join(rd_for_fixel_mrds)
+    .join(ad_for_fixel_mrds)
+    .set{bundle_pdds_for_fixel_mrds}
+
+process Fixel_MRDS {
+    input:
+        tuple sid, file(bundles), file(pdd), file(fa), file(md), file(rd), file(ad) from bundle_pdds_for_fixel_mrds
+
+    output:
+        set sid, "*_mrds_*.nii.gz" into fixel_mrds_for_mean_std,
+            fixel_mrds_for_endpoints_metrics, fixel_mrds_for_endpoints_roi_stats,
+            fixel_mrds_for_mean_std_per_point
+
+
+    script:
+    String bundles_list = bundles.join(", ").replace(',', '')
+    """
+    for bundle in $bundles_list;
+        do if [[ \$bundle == *"__"* ]]; then
+            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
+            bname=\${bundle:\$pos}
+            bname=\$(basename \$bname .trk)
+        else
+            bname=\$(basename \$bundle .trk)
+        fi
+        scil_bundle_mean_fixel_mrds_metric.py \$bundle \
+            $pdd --fa $fa --md $md --rd $rd --ad $ad \
+            --prefix $sid -f
     done
     """
 }
@@ -463,13 +524,15 @@ process Bundle_Endpoints_Map {
     """
 }
 
+
 metrics_for_endpoints_roi_stats
     .mix(fixel_afd_for_endpoints_roi_stats)
+    .mix(fixel_mrds_for_endpoints_roi_stats)
     .groupTuple(by: 0)
     .map{it -> [it[0], it[1..-1].flatten()]}
-    .set{metrics_afd_for_endpoints_roi_stats}
+    .set{metrics_fixel_for_endpoints_roi_stats}
 
-metrics_afd_for_endpoints_roi_stats
+metrics_fixel_for_endpoints_roi_stats
     .combine(endpoints_maps_for_roi_stats, by: 0)
     .set{metrics_endpoints_for_roi_stats}
 
@@ -521,13 +584,14 @@ process Bundle_Metrics_Stats_In_Endpoints {
 
 metrics_for_endpoints_metrics
     .mix(fixel_afd_for_endpoints_metrics)
+    .mix(fixel_mrds_for_endpoints_metrics)
     .groupTuple(by: 0)
    .map{it -> [it[0], it[1..-1].flatten()]}
-    .set{metrics_afd_for_endpoints_metrics}
+    .set{metrics_fixel_for_endpoints_metrics}
 
 bundles_for_endpoints_metrics
     .flatMap{ sid, bundles -> bundles.collect{[sid, it]} }
-    .combine(metrics_afd_for_endpoints_metrics, by: 0)
+    .combine(metrics_fixel_for_endpoints_metrics, by: 0)
     .set{metrics_bundles_for_endpoints_metrics}
 
 process Bundle_Endpoints_Metrics {
@@ -581,11 +645,12 @@ process Bundle_Endpoints_Metrics {
 
 metrics_for_mean_std
     .mix(fixel_afd_for_mean_std)
+    .mix(fixel_mrds_for_mean_std)
     .groupTuple(by: 0)
     .map{it -> [it[0], it[1..-1].flatten()]}
-    .set{metrics_afd_for_mean_std}
+    .set{metrics_fixel_for_mean_std}
 
-metrics_afd_for_mean_std
+metrics_fixel_for_mean_std
     .combine(bundles_for_mean_std, by: 0)
     .set{metrics_bundles_for_mean_std}
 process Bundle_Mean_Std {
@@ -684,11 +749,12 @@ process Bundle_Volume_Per_Label {
 
 metrics_for_mean_std_per_point
     .mix(fixel_afd_for_mean_std_per_point)
+    .mix(fixel_mrds_for_mean_std_per_point)
     .groupTuple(by: 0)
     .map{it -> [it[0], it[1..-1].flatten()]}
-    .set{metrics_afd_for_std_per_point}
+    .set{metrics_fixel_for_std_per_point}
 
-metrics_afd_for_std_per_point
+metrics_fixel_for_std_per_point
     .join(bundles_for_mean_std_per_point, by: 0)
     .join(label_distance_maps_for_mean_std_per_point, by: 0)
     .set{metrics_bundles_label_distance_maps_for_mean_std_per_point}
@@ -1016,3 +1082,4 @@ process Plot_Population_Mean_Std_Per_Point {
     mv tmp_dir/* ./
     """
 }
+

@@ -13,18 +13,30 @@ DESCRIPTION
 
                             [root]
                             ├── S1
-                            │   ├── *lesion_mask.nii.gz (optional)
-                            │   ├── *fodf.nii.gz (optional to generate fixel AFD)
-                            │   ├── metrics
+                            │   ├── *lesion_mask.nii.gz (optional)
+                            │   ├── *fodf.nii.gz (optional to generate fixel AFD)
+                            │   ├── *evecs.nii.gz (optional to generate fixel FA,MD,RD,AD)
+                            │   ├── metrics
                             │   │   └── *.nii.gz
-                            │   └── bundles
+                            │   ├── fixel_metrics (optional but needs all of them)
+                            │   │   ├── *FA.nii.gz
+                            │   │   ├── *AD.nii.gz
+                            │   │   ├── *MD.nii.gz
+                            │   │   └── *RD.nii.gz
+                            │   └── bundles
                             │       └── *.trk
                             └── S2
-                                ├── *lesion_mask.nii.gz (optional)
+                                ├── *lesion_mask.nii.gz (optional)
                                 ├── *fodf.nii.gz (optional to generate fixel AFD)
-                                ├── metrics
+                                ├── *evecs.nii.gz (optional to generate fixel FA,MD,RD,AD)
+                                ├── metrics
                                 │   └── *.nii.gz
-                                └── bundles
+                                ├── fixel_metrics (optional but needs all of them)
+                                │   ├── *FA.nii.gz
+                                │   ├── *AD.nii.gz
+                                │   ├── *MD.nii.gz
+                                │   └── *RD.nii.gz
+                                └── bundles
                                     └── *.trk
 
                             Bundle centroid will be computed on-the-fly if no
@@ -35,18 +47,18 @@ DESCRIPTION
 
                             [root]
                             ├── S1
-                            │   ├── metrics
+                            │   ├── metrics
                             │   │   └── *.nii.gz
-                            │   ├── centroids
+                            │   ├── centroids
                             │   │   └── [Bundle_Name]_centroid.trk
-                            │   └── bundles
+                            │   └── bundles
                             │       └── [Bundle_Name].trk
                             └── S2
-                                ├── metrics
+                                ├── metrics
                                 │   └── *.nii.gz
-                                ├── centroids
+                                ├── centroids
                                 │   └── [Bundle_Name]_centroid.trk
-                                └── bundles
+                                └── bundles
                                     └── [Bundle_Name].trk
 
                             Bundle and centroid file names must match the

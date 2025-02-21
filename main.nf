@@ -73,27 +73,27 @@ Channel
     .set{fodf_for_fixel_afd}
 
 Channel
-    .fromFilePairs("$params.input/**/*pdds.nii.gz",
+    .fromFilePairs("$params.input/**/*evecs.nii.gz",
         size: -1) { it.parent.name }
-    .set{pdds_for_fixel_mrds}
+    .set{evecs_for_fixel_mrds}
 
 Channel
-    .fromFilePairs("$params.input/**/fixel_metrics/*fixel_fa.nii.gz",
+    .fromFilePairs("$params.input/**/fixel_metrics/*FA.nii.gz",
         size: -1) { it.parent.parent.name }
     .set{fa_for_fixel_mrds}
 
 Channel
-    .fromFilePairs("$params.input/**/fixel_metrics/*fixel_md.nii.gz",
+    .fromFilePairs("$params.input/**/fixel_metrics/*MD.nii.gz",
         size: -1) { it.parent.parent.name }
     .set{md_for_fixel_mrds}
 
 Channel
-    .fromFilePairs("$params.input/**/fixel_metrics/*fixel_rd.nii.gz",
+    .fromFilePairs("$params.input/**/fixel_metrics/*RD.nii.gz",
         size: -1) { it.parent.parent.name }
     .set{rd_for_fixel_mrds}
 
 Channel
-    .fromFilePairs("$params.input/**/fixel_metrics/*fixel_ad.nii.gz",
+    .fromFilePairs("$params.input/**/fixel_metrics/*AD.nii.gz",
         size: -1) { it.parent.parent.name }
     .set{ad_for_fixel_mrds}
 
@@ -185,16 +185,16 @@ process Fixel_AFD {
 }
 
 bundles_for_fixel_mrds
-    .join(pdds_for_fixel_mrds)
+    .join(evecs_for_fixel_mrds)
     .join(fa_for_fixel_mrds)
     .join(md_for_fixel_mrds)
     .join(rd_for_fixel_mrds)
     .join(ad_for_fixel_mrds)
-    .set{bundle_pdds_for_fixel_mrds}
+    .set{bundle_evecs_for_fixel_mrds}
 
 process Fixel_MRDS {
     input:
-        tuple sid, file(bundles), file(pdd), file(fa), file(md), file(rd), file(ad) from bundle_pdds_for_fixel_mrds
+        tuple sid, file(bundles), file(evecs), file(fa), file(md), file(rd), file(ad) from bundle_evecs_for_fixel_mrds
 
     output:
         set sid, "*_mrds_*.nii.gz" into fixel_mrds_for_mean_std,
@@ -214,7 +214,7 @@ process Fixel_MRDS {
             bname=\$(basename \$bundle .trk)
         fi
         scil_bundle_mean_fixel_mrds_metric.py \$bundle \
-            $pdd --fa $fa --md $md --rd $rd --ad $ad \
+            $evecs --fa $fa --md $md --rd $rd --ad $ad \
             --prefix $sid -f
     done
     """

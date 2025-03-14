@@ -34,13 +34,13 @@ Singularity/Docker
 -----------
 If you are on Linux, we recommend using the Singularity to run tractometry_flow pipeline.
 If you have Apptainer (Singularity), launch your Nextflow command with:
-`-with-singularity ABSOLUTE_PATH/scilus-1.6.0.sif`
+`-with-singularity ABSOLUTE_PATH/scilus-2.0.2.sif`
 
-Image is available [here](http://scil.dinf.usherbrooke.ca/en/containers_list/scilus-1.6.0.sif)
+Image is available [here](http://scil.dinf.usherbrooke.ca/en/containers_list/scilus-2.0.2.sif)
 
 If you are on MacOS or Windows, we recommend using the Docker container to run tractometry_flow pipeline.
 Launch your Nextflow command with:
-`-with-docker scilus/scilus:1.6.0`
+`-with-docker scilus/scilus:2.0.2`
 
 Usage
 -----

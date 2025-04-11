@@ -141,15 +141,23 @@ process Remove_Invalid_Streamlines {
     """
     for bundle in $bundles_list;
       do if [[ \$bundle == *"__"* ]]; then
-          pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
-          bname=\${bundle:\$pos}
-          bname=\$(basename \$bname .trk)
+        pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
+        bname=\${bundle:\$pos}
+        bname=\$(basename \$bname .trk)
       else
-          bname=\$(basename \$bundle .trk)
+        bname=\$(basename \$bundle .trk)
       fi
       bname=\${bname/$params.bundle_suffix_to_remove/}
 
       scil_tractogram_remove_invalid.py \$bundle ${sid}__\${bname}_ic.trk --remove_single_point --remove_overlapping_points --cut_invalid --no_empty
+
+      # Remove bundle if only X streamlines
+      nb_streamlines=\$(scil_tractogram_count_streamlines.py ${sid}__\${bname}_ic.trk --print_count_alone)
+
+      if [[ \$nb_streamlines -lt $params.min_streamline_count ]]; then
+        echo "Bundle ${sid}__\${bname}_ic.trk has only \$nb_streamlines streamlines. Removing."
+        rm -rf ${sid}__\${bname}_ic.trk
+      fi
     done
     """
 }
@@ -323,10 +331,8 @@ process Bundle_Label_And_Distance_Maps {
         centroid=${sid}__\${bname}_centroid_${params.nb_points}.trk
         if [[ -f \${centroid} ]]; then
             scil_bundle_label_map.py \$bundle \${centroid} tmp_out -f
-
             mv tmp_out/labels_map.nii.gz ${sid}__\${bname}_labels.nii.gz
             mv tmp_out/distance_map.nii.gz ${sid}__\${bname}_distances.nii.gz
-
             mv tmp_out/labels.trk ${sid}__\${bname}_labels.trk
             mv tmp_out/distance.trk ${sid}__\${bname}_distances.trk
         fi
@@ -454,13 +460,14 @@ process Color_Bundle {
 
     output:
     file "*_colored.trk"
+    file "new_color_dict_*.json" optional true
 
     script:
     def json_str = JsonOutput.toJson(params.colors)
     String bundles_list = bundles.join(", ").replace(',', '')
     """
     echo '$json_str' >> colors.json
-    scil_tractogram_assign_uniform_color.py $bundles_list --dict_colors colors.json --out_suffix colored
+    scil_tractogram_assign_uniform_color.py $bundles_list --dict_colors colors.json --out_suffix colored -f
     """
 }
 

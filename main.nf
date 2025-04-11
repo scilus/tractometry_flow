@@ -460,6 +460,7 @@ process Color_Bundle {
 
     output:
     file "*_colored.trk"
+    file "new_color_dict_*.json" optional true
 
     script:
     def json_str = JsonOutput.toJson(params.colors)

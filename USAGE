@@ -1,7 +1,7 @@
 Scilpy dMRI tractometry pipeline
 ================================
 
-Compute tractometry on each bundles/metrics
+Compute tractometry on each bundles/metrics.
 
 USAGE
 
@@ -71,7 +71,7 @@ DESCRIPTION
 
 
 Metrics should be compressed Nifti files (.nii.gz) and centroids and fiber bundles should be
-in Trackvis format (.trk)
+in Trackvis format (.trk).
 
 OPTIONAL ARGUMENTS (current value)
 
@@ -80,6 +80,7 @@ OPTIONAL ARGUMENTS (current value)
 --use_provided_centroids                    Use the provided pre-computed centroids rather than using automatic computation ($use_provided_centroids)
 --skip_tract_profiles                       Skip all the steps that include tract profiling ($skip_tract_profiles)
 --min_streamline_count                      Minimum number of streamlines in a bundle to be considered ($min_streamline_count) 
+--min_streamline_length                     Minimum length of a streamline to be considered ($min_streamline_length mm)
 
 --bundle_suffix_to_remove                   Use to remove the suffix from RBx-Flow ($bundle_suffix_to_remove)
 
@@ -99,6 +100,10 @@ macos                                    When this profile is used, rbx_flow wil
 
 cbrain                                   When this profile is used, Nextflow will copy all the output files in publishDir and not use symlinks.
 
+WARNING
+
+Tractometry MAY fail if a bundle contains very short streamlines (<5mm).
+If it's the case, you can use the --min_streamline_length (mm) argument to remove them.
 
 NOTES
 

@@ -14,6 +14,7 @@ if(params.help) {
                 "nb_points":"$params.nb_points",
                 "min_lesion_vol":"$params.min_lesion_vol",
                 "min_streamline_count":"$params.min_streamline_count",
+                "min_streamline_length":"$params.min_streamline_length",
                 "min_voxel_count":"$params.min_voxel_count",
                 "mean_std_density_weighting":"$params.mean_std_density_weighting",
                 "mean_std_per_point_density_weighting":"$params.mean_std_per_point_density_weighting",
@@ -140,16 +141,17 @@ process Remove_Invalid_Streamlines {
     String bundles_list = bundles.join(", ").replace(',', '')
     """
     for bundle in $bundles_list;
-      do if [[ \$bundle == *"__"* ]]; then
-        pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
-        bname=\${bundle:\$pos}
-        bname=\$(basename \$bname .trk)
-      else
-        bname=\$(basename \$bundle .trk)
-      fi
-      bname=\${bname/$params.bundle_suffix_to_remove/}
+        do if [[ \$bundle == *"__"* ]]; then
+            pos=\$((\$(echo \$bundle | grep -b -o __ | cut -d: -f1)+2))
+            bname=\${bundle:\$pos}
+            bname=\$(basename \$bname .trk)
+        else
+            bname=\$(basename \$bundle .trk)
+        fi
+        bname=\${bname/$params.bundle_suffix_to_remove/}
 
-      scil_tractogram_remove_invalid.py \$bundle ${sid}__\${bname}_ic.trk --remove_single_point --remove_overlapping_points --cut_invalid --no_empty
+        scil_tractogram_filter_by_length.py \$bundle tmp_\${bundle}.trk --minL $params.min_streamline_length
+        scil_tractogram_remove_invalid.py tmp_\${bundle}.trk ${sid}__\${bname}_ic.trk --remove_single_point --remove_overlapping_points --cut_invalid --no_empty
 
       # Remove bundle if only X streamlines
       nb_streamlines=\$(scil_tractogram_count_streamlines.py ${sid}__\${bname}_ic.trk --print_count_alone)
@@ -523,8 +525,8 @@ process Bundle_Endpoints_Map {
 
         scil_bundle_compute_endpoints_map.py \$bname.trk \
             ${sid}__\${bname}_endpoints_map_head.nii.gz \
-            ${sid}__\${bname}_endpoints_map_tail.nii.gz >\
-            ${sid}__\${bname}_endpoints_map_raw.json
+            ${sid}__\${bname}_endpoints_map_tail.nii.gz \
+            --out_json ${sid}__\${bname}_endpoints_map_raw.json
     done
     scil_json_merge_entries.py *_endpoints_map_raw.json ${sid}__endpoints_map_raw.json \
         --no_list --add_parent_key ${sid}

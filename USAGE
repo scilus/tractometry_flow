@@ -76,11 +76,11 @@ in Trackvis format (.trk).
 OPTIONAL ARGUMENTS (current value)
 
 --nb_points                                 Split the fiber bundle in --nb_point sections ($nb_points)
---min_lesion_vol                            To be consider 'a lesion' for the pipeline, a lesion must be at least ($min_lesion_vol) mm3.
+--min_lesion_vol                            To be consider 'a lesion' for the pipeline, a lesion must be at least ($min_lesion_vol) mm3
 --use_provided_centroids                    Use the provided pre-computed centroids rather than using automatic computation ($use_provided_centroids)
 --skip_tract_profiles                       Skip all the steps that include tract profiling ($skip_tract_profiles)
 --min_streamline_count                      Minimum number of streamlines in a bundle to be considered ($min_streamline_count) 
---min_streamline_length                     Minimum length of a streamline to be considered ($min_streamline_length mm)
+--min_streamline_length                     Minimum length of a streamline to be considered ($min_streamline_length) mm
 
 --bundle_suffix_to_remove                   Use to remove the suffix from RBx-Flow ($bundle_suffix_to_remove)
 

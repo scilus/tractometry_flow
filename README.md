@@ -28,7 +28,18 @@ Requirements
 ------------
 
 - [Nextflow](https://www.nextflow.io)
-- [scilpy](https://github.com/scilus/scilpy)
+
+Please download [nextflow_21.10.6](https://github.com/nextflow-io/nextflow/releases/download/v21.10.6/nextflow-21.10.6-all) (or any version <= 21.10.6).
+
+Installation
+-----------
+
+`ǹextflow pull scilus/tractometry_flow`
+
+Usage
+-----------
+
+See *USAGE* or run `nextflow run scilus/tractometry_flow -r 1.2.0 --help`
 
 Singularity/Docker
 -----------
@@ -55,8 +66,3 @@ and then launch your Nextflow command with:
 
 Or launch your Nextflow command with docker:
 `-with-docker scilus/scilus:latest`
-
-Usage
------
-
-See *USAGE* or run `nextflow run main.nf --help`

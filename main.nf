@@ -204,7 +204,7 @@ bundles_for_fixel_mrds
 
 process Fixel_MRDS {
     input:
-        tuple sid, file(bundles), file(evecs), file(fa), file(md), file(rd), file(ad) from bundle_evecs_for_fixel_mrds
+        set sid, file(bundles), file(evecs), file(fa), file(md), file(rd), file(ad) from bundle_evecs_for_fixel_mrds
 
     output:
         set sid, "*_mrds_*.nii.gz" into fixel_mrds_for_mean_std,

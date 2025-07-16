@@ -50,14 +50,14 @@ DESCRIPTION
                             │   ├── metrics
                             │   │   └── *.nii.gz
                             │   ├── centroids
-                            │   │   └── [Bundle_Name]_centroid.trk
+                            │   │   └── [Bundle_Name].trk
                             │   └── bundles
                             │       └── [Bundle_Name].trk
                             └── S2
                                 ├── metrics
                                 │   └── *.nii.gz
                                 ├── centroids
-                                │   └── [Bundle_Name]_centroid.trk
+                                │   └── [Bundle_Name].trk
                                 └── bundles
                                     └── [Bundle_Name].trk
 

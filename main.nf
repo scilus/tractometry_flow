@@ -1051,7 +1051,8 @@ process Aggregate_All_Mean_Std_Per_Point {
     file jsons from all_mean_std_per_point_to_aggregate
 
     output:
-    file "mean_std_per_point.json" into population_mean_std_per_point
+    file "mean_std_per_point_population.json" into population_mean_std_per_point
+    file "mean_std_per_point.json"
     file "mean_std_per_point.xlsx"
 
     script:
@@ -1060,11 +1061,13 @@ process Aggregate_All_Mean_Std_Per_Point {
     for json in $json_list
         do scil_json_merge_entries.py \$json \${json/.json/_avg.json} --remove_parent_key --recursive
     done
-    scil_json_merge_entries.py *_avg.json mean_std_per_point.json  \
-        --recursive
-    scil_json_harmonize_entries.py mean_std_per_point.json mean_std_per_point.json -f -v --sort_keys
-    scil_json_convert_entries_to_xlsx.py mean_std_per_point.json mean_std_per_point.xlsx \
+    scil_json_merge_entries.py *_avg.json mean_std_per_point_population.json --recursive
+    scil_json_harmonize_entries.py mean_std_per_point_population.json mean_std_per_point_population.json -f -v --sort_keys
+    scil_json_convert_entries_to_xlsx.py mean_std_per_point_population.json mean_std_per_point_population.xlsx \
         --stats_over_population
+
+    scil_json_merge_entries.py $jsons mean_std_per_point.json
+    scil_json_convert_entries_to_xlsx.py mean_std_per_point.json mean_std_per_point.xlsx
     """
 }
 

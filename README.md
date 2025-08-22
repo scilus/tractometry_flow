@@ -34,7 +34,7 @@ Please download [nextflow_21.10.6](https://github.com/nextflow-io/nextflow/relea
 Installation
 -----------
 
-`ǹextflow pull scilus/tractometry_flow`
+`nextflow pull scilus/tractometry_flow`
 
 Usage
 -----------

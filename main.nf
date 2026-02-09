@@ -329,7 +329,6 @@ process Bundle_Label_And_Distance_Maps {
             bname=\$(basename \$bundle .trk)
         fi
         bname=\${bname/_ic/}
-
         centroid=${sid}__\${bname}_centroid_${params.nb_points}.trk
         if [[ -f \${centroid} ]]; then
             scil_bundle_label_map.py \$bundle \${centroid} tmp_out -f
@@ -636,10 +635,27 @@ process Bundle_Endpoints_Metrics {
         b_metrics+=" afd_metric.nii.gz"
     fi
 
-    scil_tractogram_project_streamlines_to_map.py \$bundle \${bname} --in_metrics \${b_metrics} --from_wm
+    IFS=' ' read -r -a all_items <<< "\${b_metrics}"
+
+    block_size=10
+    i=0
+    while [ \$i -lt \${#all_items[@]} ]; do
+        subset=("\${all_items[@]:\$i:\$block_size}")
+        scil_tractogram_project_map_to_streamlines.py \${bundle} \${bundle/.trk/_with_dpp.trk} \
+            --in_maps \${subset[@]} \
+            --out_dpp_name \${subset[@]//.nii.gz/} -f
+
+        scil_tractogram_project_streamlines_to_map.py \${bundle/.trk/_with_dpp.trk} \${bname}/ \
+            --use_dpp \${subset[@]//.nii.gz/} \
+            --mean_streamline \
+            --to_endpoints
+
+        ((i += block_size))
+    done
+
     cd \${bname}
     for i in *.nii.gz;
-        do mv "\$i" "${sid}__\$i";
+        do mv "\$i" "${sid}__\${i/.nii.gz/_endpoints_metric.nii.gz}";
     done
 
     for i in *;

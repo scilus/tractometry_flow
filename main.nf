@@ -584,6 +584,9 @@ process Bundle_Metrics_Stats_In_Endpoints {
             --metrics \${b_metrics} > \${bname}_head.json
         scil_volume_stats_in_ROI.py \${bname}_tail.nii.gz $normalize_weights\
             --metrics \${b_metrics} > \${bname}_tail.json
+            
+        scil_json_merge_entries.py \${bname}_head.json \${bname}_head.json --add_parent_key \${bname}_head -f
+        scil_json_merge_entries.py \${bname}_tail.json \${bname}_tail.json --add_parent_key \${bname}_tail -f
     done
 
     scil_json_merge_entries.py *_tail.json *_head.json ${sid}__endpoints_metric_stats.json \
